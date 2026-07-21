@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineVerse | Premium Movie Catalog</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #0f0f13;
+            color: #e0e0e0;
+            padding: 30px 20px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        
+        /* Header Styling */
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .logo {
+            font-size: 2.8rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #ff0055, #ff5050);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+        }
+        .subtitle {
+            color: #8a8a9e;
+            font-size: 1rem;
+            margin-top: 5px;
+        }
+
+        /* Form Container */
+        .form-card {
+            background: #181820;
+            border: 1px solid #2a2a36;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            margin-bottom: 40px;
+        }
+        .form-card h3 {
+            color: #ffffff;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #ff0055;
+            display: inline-block;
+            padding-bottom: 5px;
+        }
+        .grid-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #2e2e3e;
+            background-color: #0f0f13;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+            transition: 0.3s;
+        }
+        input:focus {
+            border-color: #ff0055;
+        }
+        .btn-submit {
+            background: linear-gradient(45deg, #ff0055, #e6004c);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+        .btn-submit:hover {
+            opacity: 0.9;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #ffffff;
+        }
+
+        /* Movie Cards Grid */
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+        }
+        .movie-card {
+            background: #181820;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2a2a36;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .movie-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(255, 0, 85, 0.15);
+        }
+        .movie-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .movie-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        .movie-rating {
+            background: #252533;
+            color: #ffd700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+        .movie-details {
+            font-size: 0.85rem;
+            color: #a0a0b0;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        .tag {
+            background: #232330;
+            color: #8a8a9e;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        /* Remark Box */
+        .remark-container {
+            background-color: #0f0f13;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            border-left: 3px solid #ff0055;
+        }
+        .remark-label {
+            font-size: 0.75rem;
+            color: #8a8a9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .remark-text {
+            font-size: 0.85rem;
+            color: #e0e0e0;
+            margin-top: 3px;
+        }
+
+        /* Remark Inputs */
+        .remark-input-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .remark-input-group input {
+            padding: 8px 10px;
+            font-size: 0.8rem;
+        }
+        .btn-remark {
+            background-color: #2a2a36;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            transition: 0.2s;
+        }
+        .btn-remark:hover {
+            background-color: #ff0055;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="logo">🍿 CINEVERSE</div>
+        <div class="subtitle">Your Personal Movie Catalog & Recommendation Hub</div>
+    </header>
+
+    <!-- Add Movie Form -->
+    <div class="form-card">
+        <h3>+ Add New Movie</h3>
+        <div class="grid-inputs">
+            <input type="text" id="MovieName" placeholder="Movie Title (e.g. Inception)" required>
+            <input type="text" id="Genre" placeholder="Genre (e.g. Sci-Fi)" required>
+            <input type="text" id="Language" placeholder="Language (e.g. Hindi/English)" required>
+            <input type="number" step="0.1" id="Rating" placeholder="Rating (1-10)" required>
+            <input type="number" id="ReleaseYear" placeholder="Release Year" required>
+            <input type="text" id="Director" placeholder="Director" required>
+        </div>
+        <button class="btn-submit" onclick="addMovie()">Add to Collection</button>
+    </div>
+
+    <!-- Movie List -->
+    <h2 class="section-title">Trending Catalog</h2>
+    <div id="moviesGrid" class="movie-grid">
+        <!-- Dynamic Movies Render Here -->
+    </div>
+</div>
+
+<script>
+    const API_URL = "https://v3aatdjlzb.execute-api.eu-north-1.amazonaws.com/dev/movies";
+
+    async function fetchMovies() {
+        try {
+            const res = await fetch(API_URL);
+            const movies = await res.json();
+            const grid = document.getElementById('moviesGrid');
+            grid.innerHTML = '';
+
+            movies.forEach(movie => {
+                const card = document.createElement('div');
+                card.className = 'movie-card';
+
+                const title = movie.MovieName || movie.name || 'Untitled';
+                const year = movie.ReleaseYear || movie.year || 'N/A';
+                const director = movie.Director || movie.director || 'N/A';
+                const genre = movie.Genre || movie.genre || 'N/A';
+                const language = movie.Language || movie.language || 'N/A';
+                const rating = movie.Rating || movie.rating || 'N/A';
+                const remark = movie.remark ? movie.remark : 'No reviews added yet.';
+
+                card.innerHTML = `
+                    <div>
+                        <div class="movie-header">
+                            <div class="movie-title">${title}</div>
+                            <div class="movie-rating">★ ${rating}</div>
+                        </div>
+                        <div class="movie-details">
+                            <div><b>Year:</b> ${year} | <b>Lang:</b> ${language}</div>
+                            <div><b>Director:</b> ${director}</div>
+                            <div style="margin-top: 5px;"><span class="tag">${genre}</span></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="remark-container">
+                            <div class="remark-label">User Review / Remark</div>
+                            <div class="remark-text">${remark}</div>
+                        </div>
+
+                        <div class="remark-input-group">
+                            <input type="text" id="input-${movie.MovieId}" placeholder="Write a review...">
+                            <button class="btn-remark" onclick="addRemark('${movie.MovieId}')">Save</button>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        } catch (err) {
+            console.error('Error fetching movies:', err);
+        }
+    }
+
+    async function addMovie() {
+        const movieName = document.getElementById('MovieName').value;
+        if (!movieName) return alert('Movie title is required!');
+
+        const movieData = {
+            MovieId: Date.now().toString(),
+            MovieName: movieName,
+            Genre: document.getElementById('Genre').value || 'N/A',
+            Language: document.getElementById('Language').value || 'N/A',
+            Rating: parseFloat(document.getElementById('Rating').value) || 0,
+            ReleaseYear: parseInt(document.getElementById('ReleaseYear').value) || new Date().getFullYear(),
+            Director: document.getElementById('Director').value || 'N/A',
+            Status: 'Active',
+            CreatedAt: new Date().toISOString()
+        };
+
+        await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(movieData)
+        });
+
+        // Clear input fields
+        document.getElementById('MovieName').value = '';
+        document.getElementById('Genre').value = '';
+        document.getElementById('Language').value = '';
+        document.getElementById('Rating').value = '';
+        document.getElementById('ReleaseYear').value = '';
+        document.getElementById('Director').value = '';
+
+        fetchMovies();
+    }
+
+    async function addRemark(movieId) {
+        const inputElem = document.getElementById(`input-${movieId}`);
+        const inputVal = inputElem ? inputElem.value : '';
+
+        if (!inputVal.trim()) {
+            alert('Please enter a remark first!');
+            return;
+        }
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'update_remark',
+                    MovieId: movieId, 
+                    remark: inputVal 
+                })
+            });
+
+            if (response.ok) {
+                fetchMovies(); // Reload updated movies instantly
+            } else {
+                alert('Failed to save remark.');
+            }
+        } catch (err) {
+            console.error('Error saving remark:', err);
+        }
+    }
+
+    window.onload = fetchMovies;
+</script>
+
+</body>
+</html>
