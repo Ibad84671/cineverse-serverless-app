@@ -1,11 +1,11 @@
-# 🎬 Cineverse - Serverless Movie Catalog on AWS
+# 🎬 Cineverse – Production-inspired Serverless AWS Application
 
-[![Terraform CI/Validation](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml)
+[![CI](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![AWS](https://img.shields.io/badge/Cloud-AWS-orange?logo=amazon-aws)](https://aws.amazon.com/)
 [![Serverless](https://img.shields.io/badge/Serverless-Yes-brightgreen)](https://aws.amazon.com/serverless/)
 
-Production‑grade, fully serverless movie catalog application deployed on AWS using **Terraform** (Infrastructure as Code) and automated through **GitHub Actions CI/CD**.
+A production-inspired serverless AWS portfolio application demonstrating infrastructure as code, authentication, CI/CD, security controls and operational practices.
 
 ---
 
@@ -123,7 +123,7 @@ cineverse-serverless-app/
 | **API Authorization** | DELETE restricted to users in the `admins` Cognito group |
 | **Secrets Management** | No hardcoded credentials – CI uses GitHub OIDC, Lambda uses environment variables |
 | **Input Validation** | Movie name, rating, year, and allowed update fields are validated server‑side |
-| **XSS Protection** | Frontend uses `textContent` for dynamic content rendering |
+| **XSS Protection** |Dynamic movie fields are HTML-escaped before insertion into generated markup. |
 | **IAM Least Privilege** | Lambda role grants only required DynamoDB actions on the specific table |
 | **Encryption** | DynamoDB encryption at rest (AWS‑managed) |
 | **Backup** | DynamoDB Point‑in‑Time Recovery (PITR) enabled |
