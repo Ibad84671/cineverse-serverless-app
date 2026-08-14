@@ -1,0 +1,27 @@
+name: CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: Terraform Apply
+        run: |
+          cd infrastructure
+          terraform init
+          terraform apply -auto-approve
+      - name: Sync Frontend to S3
+        run: |
+          BUCKET=$(terraform -chdir=infrastructure output -raw bucket_name)
+          aws s3 sync frontend/ s3://$BUCKET/

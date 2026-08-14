@@ -1,23 +1,62 @@
 import json
 import pytest
-from lambda_function import lambda_handler, validate_movie
+from unittest.mock import patch, MagicMock
+from lambda_function import validate_movie, get_authenticated_user, is_admin
 
 def test_validate_movie_valid():
-    data = {"MovieId": "1", "MovieName": "Test", "Rating": 8.5, "ReleaseYear": 2024}
+    data = {"MovieName": "Test", "Rating": 8.5, "ReleaseYear": 2024}
     errors = validate_movie(data)
     assert errors == []
 
 def test_validate_movie_missing_name():
-    data = {"MovieId": "1"}
+    data = {"Rating": 8.5}
     errors = validate_movie(data)
     assert "MovieName is required" in errors
 
 def test_validate_movie_invalid_rating():
-    data = {"MovieId": "1", "MovieName": "Test", "Rating": 15}
+    data = {"MovieName": "Test", "Rating": 15}
     errors = validate_movie(data)
     assert any("between 0 and 10" in e for e in errors)
 
-def test_handler_get_all():
-    event = {"httpMethod": "GET", "path": "/movies"}
-    response = lambda_handler(event, None)
-    assert response["statusCode"] in [200, 500]
+def test_validate_movie_name_too_long():
+    data = {"MovieName": "A" * 300}
+    errors = validate_movie(data)
+    assert "between 1 and 200" in errors[0]
+
+def test_validate_movie_invalid_year():
+    data = {"MovieName": "Test", "ReleaseYear": 1800}
+    errors = validate_movie(data)
+    assert "between 1900" in errors[0]
+
+def test_get_authenticated_user_valid():
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {"sub": "user-123"}
+            }
+        }
+    }
+    assert get_authenticated_user(event) == "user-123"
+
+def test_get_authenticated_user_missing():
+    assert get_authenticated_user({}) is None
+
+def test_is_admin_true():
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {"cognito:groups": "admins"}
+            }
+        }
+    }
+    assert is_admin(event) is True
+
+def test_is_admin_false():
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {"cognito:groups": "users"}
+            }
+        }
+    }
+    assert is_admin(event) is False

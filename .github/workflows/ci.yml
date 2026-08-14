@@ -7,18 +7,29 @@ on:
     branches: [ main ]
 
 jobs:
-  validate:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: pip install boto3 flake8
+        run: pip install flake8 pytest
       - name: Lint Python
-        run: flake8 backend/lambda_function.py --max-line-length=120 --ignore=F403,F405
+        run: flake8 backend/lambda_function.py --max-line-length=120 --ignore=F403,F405,W503
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install boto3 pytest moto
+      - name: Run tests
+        run: pytest tests/unit/ -v --tb=short
 
   terraform:
     runs-on: ubuntu-latest
@@ -43,3 +54,8 @@ jobs:
         with:
           directory: ./
           framework: terraform
+      - name: CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python, javascript
+      - uses: github/codeql-action/analyze@v3
