@@ -41,7 +41,6 @@ def validate_movie(data, is_update=False):
         errors.append("Invalid request body")
         return errors
 
-    # For create: MovieName is required
     if not is_update:
         if "MovieName" not in data:
             errors.append("MovieName is required")
@@ -52,7 +51,6 @@ def validate_movie(data, is_update=False):
         elif not data.get("MovieName", "").strip():
             errors.append("MovieName cannot be empty")
 
-    # Validate Rating if present
     if "Rating" in data:
         try:
             rating = float(data["Rating"])
@@ -63,7 +61,6 @@ def validate_movie(data, is_update=False):
         except (ValueError, TypeError):
             errors.append("Rating must be a number")
 
-    # Validate ReleaseYear if present
     if "ReleaseYear" in data:
         try:
             year = int(data["ReleaseYear"])
@@ -72,7 +69,46 @@ def validate_movie(data, is_update=False):
         except (ValueError, TypeError):
             errors.append("ReleaseYear must be a number")
 
-    # Validate string fields
+    for field in ["Genre", "Language", "Director", "Remark"]:
+        if field in data and not isinstance(data[field], str):
+            errors.append(f"{field} must be a string")
+
+    return errors
+
+def validate_movie_update(data):
+    errors = []
+    if not isinstance(data, dict) or not data:
+        errors.append("Request body must contain at least one field")
+        return errors
+
+    unknown = set(data.keys()) - ALLOWED_UPDATE_FIELDS
+    if unknown:
+        errors.append(f"Unsupported fields: {', '.join(sorted(unknown))}")
+
+    if "MovieName" in data:
+        if not isinstance(data["MovieName"], str):
+            errors.append("MovieName must be a string")
+        elif len(data["MovieName"]) > 200:
+            errors.append("MovieName must be between 1 and 200 characters")
+
+    if "Rating" in data:
+        try:
+            rating = float(data["Rating"])
+            if math.isnan(rating):
+                errors.append("Rating must be a number")
+            elif rating < 0 or rating > 10:
+                errors.append("Rating must be between 0 and 10")
+        except (ValueError, TypeError):
+            errors.append("Rating must be a number")
+
+    if "ReleaseYear" in data:
+        try:
+            year = int(data["ReleaseYear"])
+            if year < 1900 or year > datetime.now(timezone.utc).year + 1:
+                errors.append(f"ReleaseYear must be between 1900 and {datetime.now(timezone.utc).year + 1}")
+        except (ValueError, TypeError):
+            errors.append("ReleaseYear must be a number")
+
     for field in ["Genre", "Language", "Director", "Remark"]:
         if field in data and not isinstance(data[field], str):
             errors.append(f"{field} must be a string")
@@ -195,7 +231,6 @@ def handle_put(event):
 
     movie_id = path_params["movie_id"]
 
-    # Check if movie exists and get owner
     try:
         existing = table.get_item(Key={"MovieId": movie_id})
         if "Item" not in existing:
@@ -212,8 +247,7 @@ def handle_put(event):
     except json.JSONDecodeError:
         return response(400, {"error": "Invalid JSON"})
 
-    # Validate update fields
-    errors = validate_movie(body, is_update=True)
+    errors = validate_movie_update(body)
     if errors:
         return response(400, {"error": "Validation failed", "details": errors})
 
@@ -222,8 +256,6 @@ def handle_put(event):
     expr_names = {}
 
     for key, value in body.items():
-        if key not in ALLOWED_UPDATE_FIELDS:
-            return response(400, {"error": f"Field '{key}' not allowed for update"})
         field = f"#{key}"
         val = f":{key}"
         update_parts.append(f"{field} = {val}")

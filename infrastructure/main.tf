@@ -15,6 +15,14 @@ terraform {
       version = "~> 3.6"
     }
   }
+
+  backend "s3" {
+    bucket       = "cineverse-terraform-state"
+    key          = "cineverse/dev/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
+  }
 }
 
 provider "aws" {
@@ -59,28 +67,33 @@ resource "aws_s3_bucket_ownership_controls" "frontend" {
 }
 
 # ─── S3 BUCKET POLICY FOR CLOUDFRONT OAC ────────────────────────────
+data "aws_iam_policy_document" "frontend_bucket_policy" {
+  statement {
+    sid    = "AllowCloudFrontRead"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    actions = ["s3:GetObject"]
+
+    resources = [
+      "${aws_s3_bucket.frontend.arn}/*"
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.frontend.arn]
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "frontend" {
   bucket = aws_s3_bucket.frontend.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowCloudFrontRead"
-        Effect = "Allow"
-        Principal = {
-          Service = "cloudfront.amazonaws.com"
-        }
-        Action   = "s3:GetObject"
-        Resource = "${aws_s3_bucket.frontend.arn}/*"
-        Condition = {
-          StringEquals = {
-            "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
-          }
-        }
-      }
-    ]
-  })
+  policy = data.aws_iam_policy_document.frontend_bucket_policy.json
 }
 
 # ─── CLOUDFRONT ──────────────────────────────────────────────────────
@@ -197,7 +210,8 @@ resource "aws_iam_policy" "lambda_dynamodb" {
         "dynamodb:GetItem",
         "dynamodb:PutItem",
         "dynamodb:UpdateItem",
-        "dynamodb:DeleteItem"
+        "dynamodb:DeleteItem",
+        "dynamodb:Query"
       ]
       Resource = aws_dynamodb_table.movies.arn
     }]
@@ -256,6 +270,7 @@ resource "aws_cognito_user_group" "admins" {
   name         = "admins"
   user_pool_id = aws_cognito_user_pool.this.id
   description  = "Cineverse administrators"
+  precedence   = 10
 }
 
 # ─── API GATEWAY ────────────────────────────────────────────────────
@@ -332,7 +347,7 @@ resource "aws_api_gateway_integration" "movies_post" {
   uri                     = aws_lambda_function.movies.invoke_arn
 }
 
-# ─── PUT (authenticated + owner) ──────────────────────────────────
+# ─── PUT (authenticated + owner/admin) ────────────────────────────
 resource "aws_api_gateway_method" "movie_put" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.movie_item.id
@@ -532,6 +547,20 @@ resource "aws_cloudwatch_metric_alarm" "lambda_throttles" {
   dimensions = { FunctionName = aws_lambda_function.movies.function_name }
 }
 
+resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
+  alarm_name = "${var.project_name}-lambda-duration"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods = 2
+  metric_name = "Duration"
+  namespace = "AWS/Lambda"
+  period = 300
+  statistic = "p95"
+  threshold = 5000
+  alarm_description = "Lambda duration p95 > 5s"
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  dimensions = { FunctionName = aws_lambda_function.movies.function_name }
+}
+
 resource "aws_cloudwatch_metric_alarm" "api_5xx" {
   alarm_name = "${var.project_name}-api-5xx"
   comparison_operator = "GreaterThanThreshold"
@@ -560,18 +589,18 @@ resource "aws_cloudwatch_metric_alarm" "api_4xx" {
   dimensions = { ApiName = aws_api_gateway_rest_api.api.name }
 }
 
-resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
-  alarm_name = "${var.project_name}-lambda-duration"
+resource "aws_cloudwatch_metric_alarm" "dynamodb_throttles" {
+  alarm_name = "${var.project_name}-dynamodb-throttles"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods = 2
-  metric_name = "Duration"
-  namespace = "AWS/Lambda"
+  evaluation_periods = 1
+  metric_name = "ThrottledRequests"
+  namespace = "AWS/DynamoDB"
   period = 300
-  statistic = "p95"
-  threshold = 5000
-  alarm_description = "Lambda duration p95 > 5s"
+  statistic = "Sum"
+  threshold = 1
+  alarm_description = "DynamoDB throttled requests"
   alarm_actions = [aws_sns_topic.alerts.arn]
-  dimensions = { FunctionName = aws_lambda_function.movies.function_name }
+  dimensions = { TableName = aws_dynamodb_table.movies.name }
 }
 
 # ─── DATA SOURCES ──────────────────────────────────────────────────

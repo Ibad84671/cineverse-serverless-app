@@ -36,3 +36,12 @@ jobs:
         run: |
           DIST_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Aliases.Items[0]=='$(terraform -chdir=infrastructure output -raw cloudfront_url | cut -d'.' -f1).cloudfront.net']" --output text)
           aws cloudfront create-invalidation --distribution-id $DIST_ID --paths "/*"
+      - name: Smoke Test
+        run: |
+          FRONTEND_URL="https://$(terraform -chdir=infrastructure output -raw cloudfront_url)"
+          API_URL="$(terraform -chdir=infrastructure output -raw api_url)"
+          echo "Testing frontend: $FRONTEND_URL"
+          curl --fail --silent --show-error "$FRONTEND_URL" || exit 1
+          echo "Testing API: $API_URL"
+          curl --fail --silent --show-error "$API_URL" || exit 1
+          echo "✅ Smoke tests passed!"
