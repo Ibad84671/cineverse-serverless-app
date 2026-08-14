@@ -59,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Checkov
-        uses: bridgecrewio/checkov-action@v12.250.0
+        uses: bridgecrewio/checkov-action@v12.3116.0
         with:
           directory: ./
           framework: terraform
