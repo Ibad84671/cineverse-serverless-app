@@ -3,7 +3,7 @@ output "bucket_name" {
 }
 
 output "api_url" {
-  value = "${aws_api_gateway_deployment.prod.invoke_url}/movies"
+  value = "${aws_api_gateway_stage.dev.invoke_url}/movies"
 }
 
 output "cloudfront_url" {
