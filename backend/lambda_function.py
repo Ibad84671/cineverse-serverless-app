@@ -3,7 +3,8 @@ import os
 import uuid
 import logging
 import base64
-from datetime import datetime
+import math
+from datetime import datetime, timezone
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
@@ -34,45 +35,47 @@ def response(status_code, body):
         "body": json.dumps(body)
     }
 
-def validate_movie(data):
+def validate_movie(data, is_update=False):
     errors = []
     if not data or not isinstance(data, dict):
         errors.append("Invalid request body")
         return errors
 
-    if "MovieName" not in data:
-        errors.append("MovieName is required")
-    else:
-        name = data["MovieName"]
-        if not isinstance(name, str):
+    # For create: MovieName is required
+    if not is_update:
+        if "MovieName" not in data:
+            errors.append("MovieName is required")
+        elif not isinstance(data.get("MovieName"), str):
             errors.append("MovieName must be a string")
-        elif len(name) > 200:
+        elif len(data.get("MovieName", "")) > 200:
             errors.append("MovieName must be between 1 and 200 characters")
-        elif not name.strip():
+        elif not data.get("MovieName", "").strip():
             errors.append("MovieName cannot be empty")
 
+    # Validate Rating if present
     if "Rating" in data:
         try:
             rating = float(data["Rating"])
-            if rating < 0 or rating > 10:
+            if math.isnan(rating):
+                errors.append("Rating must be a number")
+            elif rating < 0 or rating > 10:
                 errors.append("Rating must be between 0 and 10")
         except (ValueError, TypeError):
             errors.append("Rating must be a number")
 
+    # Validate ReleaseYear if present
     if "ReleaseYear" in data:
         try:
             year = int(data["ReleaseYear"])
-            if year < 1900 or year > datetime.now().year + 1:
-                errors.append(f"ReleaseYear must be between 1900 and {datetime.now().year + 1}")
+            if year < 1900 or year > datetime.now(timezone.utc).year + 1:
+                errors.append(f"ReleaseYear must be between 1900 and {datetime.now(timezone.utc).year + 1}")
         except (ValueError, TypeError):
             errors.append("ReleaseYear must be a number")
 
-    if "Genre" in data and not isinstance(data["Genre"], str):
-        errors.append("Genre must be a string")
-    if "Language" in data and not isinstance(data["Language"], str):
-        errors.append("Language must be a string")
-    if "Director" in data and not isinstance(data["Director"], str):
-        errors.append("Director must be a string")
+    # Validate string fields
+    for field in ["Genre", "Language", "Director", "Remark"]:
+        if field in data and not isinstance(data[field], str):
+            errors.append(f"{field} must be a string")
 
     return errors
 
@@ -152,12 +155,12 @@ def handle_post(event):
     except json.JSONDecodeError:
         return response(400, {"error": "Invalid JSON"})
 
-    errors = validate_movie(body)
+    errors = validate_movie(body, is_update=False)
     if errors:
         return response(400, {"error": "Validation failed", "details": errors})
 
     movie_id = str(uuid.uuid4())
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     item = {
         "MovieId": movie_id,
@@ -192,12 +195,7 @@ def handle_put(event):
 
     movie_id = path_params["movie_id"]
 
-    try:
-        body = json.loads(event.get("body", "{}"))
-    except json.JSONDecodeError:
-        return response(400, {"error": "Invalid JSON"})
-
-    # Check ownership – only owner or admin can update
+    # Check if movie exists and get owner
     try:
         existing = table.get_item(Key={"MovieId": movie_id})
         if "Item" not in existing:
@@ -209,8 +207,18 @@ def handle_put(event):
         logger.error(f"DynamoDB error checking ownership: {e}")
         return response(500, {"error": "Database error"})
 
+    try:
+        body = json.loads(event.get("body", "{}"))
+    except json.JSONDecodeError:
+        return response(400, {"error": "Invalid JSON"})
+
+    # Validate update fields
+    errors = validate_movie(body, is_update=True)
+    if errors:
+        return response(400, {"error": "Validation failed", "details": errors})
+
     update_parts = []
-    expr_values = {":updatedAt": datetime.now().isoformat()}
+    expr_values = {":updatedAt": datetime.now(timezone.utc).isoformat()}
     expr_names = {}
 
     for key, value in body.items():

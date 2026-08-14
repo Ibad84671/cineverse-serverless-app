@@ -16,15 +16,6 @@ variable "table_name" {
   default     = "MovieCatalog"
 }
 
-variable "allowed_origin" {
-  description = "Frontend origin (CloudFront URL) – must be HTTPS"
-  type        = string
-  validation {
-    condition     = startswith(var.allowed_origin, "https://")
-    error_message = "allowed_origin must use HTTPS."
-  }
-}
-
 variable "alert_email" {
   description = "Email address for CloudWatch alarms"
   type        = string

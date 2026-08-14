@@ -1,12 +1,8 @@
 # Copy this file to terraform.tfvars and update values
 
-aws_region      = "us-east-1"
-project_name    = "cineverse"
-table_name      = "MovieCatalog"
+aws_region   = "us-east-1"
+project_name = "cineverse"
+table_name   = "MovieCatalog"
 
-# IMPORTANT: This must be the actual CloudFront URL after deployment
-# Run `terraform apply` first, then update this value and re-apply
-allowed_origin = "https://your-cloudfront-url.cloudfront.net"
-
-# Email for alarms
+# Email for CloudWatch alarms
 alert_email = "your-email@example.com"

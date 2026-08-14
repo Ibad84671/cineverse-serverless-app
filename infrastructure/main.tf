@@ -15,15 +15,6 @@ terraform {
       version = "~> 3.6"
     }
   }
-
-  backend "s3" {
-    # Replace these with your actual state bucket
-    bucket       = "cineverse-terraform-state"
-    key          = "cineverse/dev/terraform.tfstate"
-    region       = "us-east-1"
-    use_lockfile = true
-    encrypt      = true
-  }
 }
 
 provider "aws" {
@@ -172,7 +163,7 @@ resource "aws_lambda_function" "movies" {
   environment {
     variables = {
       MOVIE_TABLE_NAME = aws_dynamodb_table.movies.name
-      ALLOWED_ORIGIN   = var.allowed_origin
+      ALLOWED_ORIGIN   = "https://${aws_cloudfront_distribution.frontend.domain_name}"
     }
   }
   tags = var.tags
@@ -206,8 +197,7 @@ resource "aws_iam_policy" "lambda_dynamodb" {
         "dynamodb:GetItem",
         "dynamodb:PutItem",
         "dynamodb:UpdateItem",
-        "dynamodb:DeleteItem",
-        "dynamodb:Scan"
+        "dynamodb:DeleteItem"
       ]
       Resource = aws_dynamodb_table.movies.arn
     }]
@@ -275,7 +265,6 @@ resource "aws_api_gateway_rest_api" "api" {
   tags        = var.tags
 }
 
-# API Gateway Authorizer (Cognito)
 resource "aws_api_gateway_authorizer" "cognito" {
   name = "${var.project_name}-cognito"
   rest_api_id = aws_api_gateway_rest_api.api.id
@@ -284,7 +273,6 @@ resource "aws_api_gateway_authorizer" "cognito" {
   provider_arns = [aws_cognito_user_pool.this.arn]
 }
 
-# Resources
 resource "aws_api_gateway_resource" "movies" {
   rest_api_id = aws_api_gateway_rest_api.api.id
   parent_id   = aws_api_gateway_rest_api.api.root_resource_id
@@ -378,7 +366,7 @@ resource "aws_api_gateway_integration" "movie_delete" {
   uri                     = aws_lambda_function.movies.invoke_arn
 }
 
-# ─── OPTIONS (CORS) with proper headers ────────────────────────────
+# ─── OPTIONS (CORS) ────────────────────────────────────────────────
 resource "aws_api_gateway_method" "movies_options" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.movies.id
@@ -396,7 +384,7 @@ resource "aws_api_gateway_integration" "movies_options" {
     response_parameters = {
       "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
       "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-      "method.response.header.Access-Control-Allow-Origin"  = var.allowed_origin
+      "method.response.header.Access-Control-Allow-Origin"  = "https://${aws_cloudfront_distribution.frontend.domain_name}"
     }
   }
 }
@@ -429,7 +417,7 @@ resource "aws_api_gateway_integration" "movie_options" {
     response_parameters = {
       "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
       "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-      "method.response.header.Access-Control-Allow-Origin"  = var.allowed_origin
+      "method.response.header.Access-Control-Allow-Origin"  = "https://${aws_cloudfront_distribution.frontend.domain_name}"
     }
   }
 }
@@ -445,7 +433,7 @@ resource "aws_api_gateway_method_response" "movie_options_200" {
   }
 }
 
-# ─── API THROTTLING ────────────────────────────────────────────────
+# ─── API DEPLOYMENT ─────────────────────────────────────────────────
 resource "aws_api_gateway_deployment" "prod" {
   depends_on = [
     aws_api_gateway_integration.movies_get,
@@ -460,21 +448,6 @@ resource "aws_api_gateway_deployment" "prod" {
   stage_name  = "dev"
 }
 
-resource "aws_api_gateway_stage" "dev" {
-  stage_name    = "dev"
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  deployment_id = aws_api_gateway_deployment.prod.id
-
-  method_settings {
-    resource_path = "/*/*"
-    http_method   = "*"
-    metrics_enabled = true
-    logging_level   = "INFO"
-    throttling_burst_limit = 20
-    throttling_rate_limit  = 10
-  }
-}
-
 resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
@@ -483,7 +456,43 @@ resource "aws_lambda_permission" "api_gateway" {
   source_arn    = "${aws_api_gateway_rest_api.api.execution_arn}/*/*/*"
 }
 
-# ─── CLOUDWATCH ALARMS ─────────────────────────────────────────────
+# ─── API GATEWAY STAGE (Throttling + Logging) ──────────────────────
+resource "aws_api_gateway_stage" "dev" {
+  deployment_id = aws_api_gateway_deployment.prod.id
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  stage_name    = "dev"
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_access.arn
+    format = jsonencode({
+      requestId        = "$context.requestId"
+      extendedRequestId = "$context.extendedRequestId"
+      status           = "$context.status"
+      method           = "$context.httpMethod"
+      resourcePath     = "$context.resourcePath"
+      sourceIp         = "$context.identity.sourceIp"
+      latency          = "$context.responseLatency"
+      integrationLatency = "$context.integrationLatency"
+      userAgent        = "$context.identity.userAgent"
+    })
+  }
+
+  method_settings {
+    path              = "/*/*"
+    http_method       = "*"
+    metrics_enabled   = true
+    logging_level     = "INFO"
+    throttling_burst_limit = 20
+    throttling_rate_limit  = 10
+  }
+}
+
+resource "aws_cloudwatch_log_group" "api_access" {
+  name              = "/aws/api-gateway/${var.project_name}-dev"
+  retention_in_days = 14
+}
+
+# ─── SNS FOR ALARMS ──────────────────────────────────────────────────
 resource "aws_sns_topic" "alerts" {
   name = "${var.project_name}-alerts"
 }
@@ -494,6 +503,7 @@ resource "aws_sns_topic_subscription" "email" {
   endpoint  = var.alert_email
 }
 
+# ─── CLOUDWATCH ALARMS ─────────────────────────────────────────────
 resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   alarm_name = "${var.project_name}-lambda-errors"
   comparison_operator = "GreaterThanThreshold"
@@ -548,6 +558,20 @@ resource "aws_cloudwatch_metric_alarm" "api_4xx" {
   alarm_description = "API Gateway 4xx errors (spike)"
   alarm_actions = [aws_sns_topic.alerts.arn]
   dimensions = { ApiName = aws_api_gateway_rest_api.api.name }
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
+  alarm_name = "${var.project_name}-lambda-duration"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods = 2
+  metric_name = "Duration"
+  namespace = "AWS/Lambda"
+  period = 300
+  statistic = "p95"
+  threshold = 5000
+  alarm_description = "Lambda duration p95 > 5s"
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  dimensions = { FunctionName = aws_lambda_function.movies.function_name }
 }
 
 # ─── DATA SOURCES ──────────────────────────────────────────────────

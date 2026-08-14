@@ -4,12 +4,13 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +24,10 @@ jobs:
         run: cd infrastructure && terraform plan -out=tfplan
       - name: Terraform Apply
         run: cd infrastructure && terraform apply tfplan
+      - name: Generate Frontend Config
+        run: |
+          API_URL=$(terraform -chdir=infrastructure output -raw api_url)
+          echo "const API_URL = '${API_URL}';" > frontend/config.js
       - name: Sync Frontend to S3
         run: |
           BUCKET=$(terraform -chdir=infrastructure output -raw bucket_name)
