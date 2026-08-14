@@ -34,31 +34,47 @@ The application follows a modern **serverless 3‑tier pattern**:
 
 ```mermaid
 flowchart TD
-    User([Internet User]) -->|"HTTPS :443"| CF[CloudFront CDN]
-    CF -->|"OAC"| S3["Private S3 Bucket<br/>Static Frontend"]
+    User([Internet User])
+    CF[CloudFront CDN]
+    S3[Private S3 Bucket<br>Static Frontend]
+    API[API Gateway REST API]
+    CP[Cognito User Pool]
+    Client[Cognito Client]
+    Lambda[Lambda Function<br>Python 3.12]
+    DB[(DynamoDB<br>MovieCatalog)]
+    CW[CloudWatch<br>Logs + Alarms]
 
-    User -->|"GET /movies"| API["API Gateway REST API"]
-
-    subgraph Auth["Cognito Authentication"]
-        CP[Cognito User Pool]
-        CP --> Client[Cognito Client]
-    end
-
-    API -->|"POST /movies"| Auth
-    API -->|"PUT /movies/{id}"| Auth
-    API -->|"DELETE /movies/{id}"| Auth
-    API -->|"GET /movies"| Lambda["Lambda Function<br/>Python 3.12"]
-    Auth -->|"JWT Validation"| Lambda
-
-    Lambda -->|"CRUD Operations"| DB[("DynamoDB<br/>MovieCatalog")]
-    Lambda -->|"Logs & Metrics"| CW[CloudWatch<br/>Logs + Alarms]
----
-
-## 📂 Repository Structure
-
+    User -->|"HTTPS :443"| CF
+    CF -->|"OAC"| S3
+    User -->|"GET /movies"| API
+    API -->|"POST /movies"| CP
+    API -->|"PUT /movies/{id}"| CP
+    API -->|"DELETE /movies/{id}"| CP
+    CP --> Client
+    API -->|"GET /movies"| Lambda
+    Client -->|"JWT Validation"| Lambda
+    Lambda -->|"CRUD Operations"| DB
+    Lambda -->|"Logs & Metrics"| CW
+🔄 Traffic Flow
+Step	Source	Destination	Port/Protocol	Direction
+1	Internet	CloudFront	HTTPS :443	Inbound
+2	CloudFront	Private S3	OAC (HTTPS)	Internal
+3	Browser (JS)	API Gateway	HTTPS :443	Inbound
+4	API Gateway	Lambda (GET)	AWS Proxy	Internal
+5	Lambda	DynamoDB	HTTPS	Internal
+6	Browser (JS)	Cognito	HTTPS	Auth
+🏗️ Infrastructure Tiers
+Tier	Service	Placement	Purpose
+Presentation	CloudFront + S3	Edge + Private Bucket	Serve static UI globally with HTTPS
+API	API Gateway REST API	Regional	Expose REST endpoints with Cognito auth
+Compute	AWS Lambda	Serverless	Execute business logic, validate input
+Data	DynamoDB	Serverless	Store movie catalog with PITR
+Authentication	Cognito User Pool	Managed	User sign‑up / sign‑in with email verification
+Monitoring	CloudWatch	Managed	Logging, metrics, and alarms
+📂 Repository Structure
 The project follows a clean, decoupled layout:
 
-```
+text
 cineverse-serverless-app/
 ├── .github/
 │   └── workflows/
@@ -82,34 +98,25 @@ cineverse-serverless-app/
 ├── SECURITY.md
 ├── LICENSE
 └── README.md                    # This file
-```
-
----
-
-## 🔒 Security & Best Practices Implemented
-
-| Category | Implementation |
-|----------|----------------|
-| **Frontend Security** | S3 bucket is **private** (Block Public Access) – only CloudFront OAC can read |
-| **CDN Security** | CloudFront with **Origin Access Control (OAC)** and HTTPS‑only viewer policy |
-| **API Authentication** | Cognito User Pool + Client – POST/PUT/DELETE require valid JWT |
-| **API Authorization** | DELETE restricted to users in the `admins` Cognito group |
-| **Secrets Management** | No hardcoded credentials – CI uses GitHub OIDC, Lambda uses environment variables |
-| **Input Validation** | Movie name, rating, year, and allowed update fields are validated server‑side |
-| **XSS Protection** | Frontend uses `textContent` for dynamic content rendering |
-| **IAM Least Privilege** | Lambda role grants only required DynamoDB actions on the specific table |
-| **Encryption** | DynamoDB encryption at rest (AWS‑managed) |
-| **Backup** | DynamoDB Point‑in‑Time Recovery (PITR) enabled |
-
-### 🔐 Security Group / Authorization Flow
-
-```
+🔒 Security & Best Practices Implemented
+Category	Implementation
+Frontend Security	S3 bucket is private (Block Public Access) – only CloudFront OAC can read
+CDN Security	CloudFront with Origin Access Control (OAC) and HTTPS‑only viewer policy
+API Authentication	Cognito User Pool + Client – POST/PUT/DELETE require valid JWT
+API Authorization	DELETE restricted to users in the admins Cognito group
+Secrets Management	No hardcoded credentials – CI uses GitHub OIDC, Lambda uses environment variables
+Input Validation	Movie name, rating, year, and allowed update fields are validated server‑side
+XSS Protection	Frontend uses textContent for dynamic content rendering
+IAM Least Privilege	Lambda role grants only required DynamoDB actions on the specific table
+Encryption	DynamoDB encryption at rest (AWS‑managed)
+Backup	DynamoDB Point‑in‑Time Recovery (PITR) enabled
+🔐 Authorization Flow
+text
 Internet
     │
     ▼
 ┌─────────────────────────────────────┐
 │ CloudFront (HTTPS + OAC)            │
-│ ────────────────────────────        │
 │ 🔓 Port 443 – Public access         │
 └──────────────┬──────────────────────┘
                │
@@ -139,193 +146,120 @@ Internet
 │ 🔒 Only Lambda IAM role can access  │
 │ 🔒 PITR enabled                     │
 └─────────────────────────────────────┘
-```
+🛠️ Technology Stack
+Component	Technology	Version
+Infrastructure	Terraform	1.6+
+Cloud Provider	AWS	-
+Frontend Hosting	S3 + CloudFront (OAC)	-
+API	API Gateway REST API	-
+Compute	AWS Lambda (Python)	3.12
+Database	DynamoDB	PAY_PER_REQUEST
+Authentication	Cognito User Pool	-
+CI/CD	GitHub Actions (OIDC)	-
+Security Scanning	Checkov, CodeQL	-
+Monitoring	CloudWatch Logs + Alarms	-
+🚀 Step‑by‑Step Deployment Guide
+📋 Prerequisites
+AWS CLI configured (aws configure) with appropriate IAM permissions
 
----
+Terraform CLI (v1.6+) installed
 
-## 🛠️ Technology Stack
+Git installed
 
-| Component | Technology | Version |
-|-----------|------------|---------|
-| **Infrastructure** | Terraform | 1.6+ |
-| **Cloud Provider** | AWS | - |
-| **Frontend Hosting** | S3 + CloudFront (OAC) | - |
-| **API** | API Gateway REST API | - |
-| **Compute** | AWS Lambda (Python) | 3.12 |
-| **Database** | DynamoDB | PAY_PER_REQUEST |
-| **Authentication** | Cognito User Pool | - |
-| **CI/CD** | GitHub Actions (OIDC) | - |
-| **Security Scanning** | Checkov, CodeQL | - |
-| **Monitoring** | CloudWatch Logs + Alarms | - |
-
----
-
-## 🚀 Step‑by‑Step Deployment Guide
-
-### 📋 Prerequisites
-
-- AWS CLI configured (`aws configure`) with appropriate IAM permissions
-- Terraform CLI (v1.6+) installed
-- Git installed
-- (Optional) Python 3.12+ for local testing
-
-### 📥 1. Clone the Repository
-
-```bash
+📥 1. Clone the Repository
+bash
 git clone https://github.com/Ibad84671/cineverse-serverless-app.git
 cd cineverse-serverless-app
-```
+⚙️ 2. Configure Environment Variables
+Create a terraform.tfvars file inside the infrastructure/ directory:
 
-### ⚙️ 2. Configure Environment Variables
-
-Create a `terraform.tfvars` file inside the `infrastructure/` directory:
-
-```hcl
+hcl
 # infrastructure/terraform.tfvars
 aws_region      = "us-east-1"
 project_name    = "cineverse"
 allowed_origin  = "https://your-cloudfront-url"   # will be shown after apply
-```
+Note: allowed_origin must be an HTTPS URL (CloudFront will provide it after deployment).
 
-> **Note:** `allowed_origin` must be an HTTPS URL (CloudFront will provide it after deployment). You can update it later.
-
-### 🏗️ 3. Initialize & Deploy
-
-```bash
+🏗️ 3. Initialize & Deploy
+bash
 cd infrastructure
 terraform init
 terraform validate
 terraform plan
 terraform apply
-```
+Type yes when prompted.
 
-Type `yes` when prompted.
-
-### 🌐 4. Access the Application
-
+🌐 4. Access the Application
 Once deployment completes, get the CloudFront URL:
 
-```bash
+bash
 terraform output cloudfront_url
-```
-
 Open the URL in your browser:
-```
+
+text
 https://<cloudfront-id>.cloudfront.net
-```
+🔐 5. Create a Cognito User
+Go to AWS Console → Cognito → User Pools → Your pool
 
-You can also get the API endpoint:
+Create a user (email/password)
 
-```bash
-terraform output api_url
-```
+Confirm the user (or use admin set password)
 
-### 🔐 5. Create a Cognito User
-
-- Go to AWS Console → Cognito → User Pools → Your pool
-- Create a user (email/password)
-- Confirm the user (or use admin set password)
-
-### 🧹 6. Clean Up (Destroy Infrastructure)
-
-To avoid ongoing AWS charges:
-
-```bash
+🧹 6. Clean Up (Destroy Infrastructure)
+bash
 terraform destroy
-```
+Type yes when prompted.
 
-Type `yes` when prompted.
+💰 Cost Estimation (us-east-1, Low Usage)
+Resource	Approx. Monthly
+S3 (static hosting)	< $0.01
+CloudFront	$0.01 – $0.05
+API Gateway	$0.01 – $0.05
+Lambda (Python 3.12)	< $0.01
+DynamoDB (PAY_PER_REQUEST)	< $0.01
+Cognito (50 MAU)	~$2.50
+CloudWatch Logs	< $0.01
+Total	~$2.50 – $3.00 / month
+⚙️ CI/CD Pipeline
+🔍 Continuous Integration (.github/workflows/ci.yml)
+Triggered on every push / pull request to main:
 
----
+✅ Python linting (flake8)
 
-## 💰 Cost Estimation (us-east-1, Low Usage)
+✅ Unit tests (pytest + moto mocks)
 
-| Resource | Approx. Monthly |
-|----------|-----------------|
-| S3 (static hosting) | < $0.01 |
-| CloudFront | $0.01 – $0.05 (free tier covers 1TB/mo) |
-| API Gateway | $0.01 – $0.05 |
-| Lambda (Python 3.12) | < $0.01 |
-| DynamoDB (PAY_PER_REQUEST) | < $0.01 |
-| Cognito (50 MAU) | ~$2.50 |
-| CloudWatch Logs | < $0.01 |
-| **Total** | **~$2.50 – $3.00 / month** |
+✅ Terraform fmt, validate
 
-> **Note:** Costs scale with usage. The architecture is designed to stay within the AWS Free Tier for light workloads.
+✅ Security scanning (Checkov, CodeQL)
 
----
+🚀 Continuous Deployment (.github/workflows/deploy.yml)
+Triggered on push to main:
 
-## ⚙️ CI/CD Pipeline
+✅ Assumes AWS IAM role via OIDC (no long‑lived credentials)
 
-The repository includes **two** GitHub Actions workflows:
+✅ Terraform plan + apply
 
-### 🔍 Continuous Integration (`.github/workflows/ci.yml`)
+✅ Syncs frontend to S3 bucket
 
-Triggered on every push / pull request to `main`:
-
-- ✅ Python linting (`flake8`)
-- ✅ Unit tests (`pytest` + `moto` mocks)
-- ✅ Terraform `fmt`, `validate`
-- ✅ Security scanning (Checkov, CodeQL)
-
-### 🚀 Continuous Deployment (`.github/workflows/deploy.yml`)
-
-Triggered on push to `main`:
-
-- ✅ Assumes AWS IAM role via **OIDC** (no long‑lived credentials)
-- ✅ Terraform `plan` + `apply`
-- ✅ Syncs frontend to S3 bucket
-
-**OIDC Trust Policy** – the AWS role is restricted to this repository and branch, following least‑privilege principles.
-
----
-
-## 🧪 Testing & Validation
-
-### Run Unit Tests Locally
-
-```bash
+🧪 Testing & Validation
+Run Unit Tests Locally
+bash
 cd backend
 pip install -r requirements.txt
 pip install pytest moto
-pytest ../tests/unit/ -v
-```
-
-### Validate Terraform
-
-```bash
+python -m pytest ../tests/unit/ -v
+Validate Terraform
+bash
 cd infrastructure
 terraform fmt -check
 terraform validate
-```
+📜 License
+Distributed under the MIT License. See LICENSE for more information.
 
-### Security Scanning (Optional)
+🤝 Contributing
+Please read CONTRIBUTING.md for details.
 
-```bash
-# Install Checkov
-pip install checkov
-checkov -d ./
+🔒 Security
+Please read SECURITY.md for details on reporting security vulnerabilities.
 
-# Run CodeQL locally (requires GitHub CLI)
-gh codeql database create --language=python
-```
-
----
-
-## 📜 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
-## 🤝 Contributing
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
-
-## 🔒 Security
-
-Please read [SECURITY.md](SECURITY.md) for details on reporting security vulnerabilities.
-
----
-
-**Made with ❤️ by Ibad**
+Made with ❤️ by Ibad
