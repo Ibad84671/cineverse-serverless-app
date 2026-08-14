@@ -1,19 +1,8 @@
 # Changelog
 
-## [1.0.0] - 2026-08-14
-
+## [0.1.0] - 2026-08-14
 ### Added
-- Initial release of Cineverse
-- Serverless architecture with S3, API Gateway, Lambda, DynamoDB
-- Terraform infrastructure
+- Initial release (work in progress)
+- Terraform infrastructure (S3, CloudFront, DynamoDB, Lambda, API Gateway, Cognito)
 - CI/CD with GitHub Actions
 - Unit tests
-- XSS protection
-- Input validation
-- Dark UI movie catalog
-
-### Fixed
-- XSS vulnerability with innerHTML
-- Input validation for rating/year
-- Environment variables for config
-- Proper DELETE endpoint

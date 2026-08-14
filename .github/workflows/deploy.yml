@@ -16,11 +16,15 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
-      - name: Terraform Apply
+      - name: Terraform Plan
         run: |
           cd infrastructure
           terraform init
-          terraform apply -auto-approve
+          terraform plan -out=tfplan
+      - name: Terraform Apply
+        run: |
+          cd infrastructure
+          terraform apply tfplan
       - name: Sync Frontend to S3
         run: |
           BUCKET=$(terraform -chdir=infrastructure output -raw bucket_name)

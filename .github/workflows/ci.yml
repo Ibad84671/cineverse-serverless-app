@@ -14,8 +14,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install dependencies
-        run: pip install flake8 pytest
+      - name: Install dev dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install flake8 pytest moto
       - name: Lint Python
         run: flake8 backend/lambda_function.py --max-line-length=120 --ignore=F403,F405,W503
 
@@ -27,7 +29,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: pip install boto3 pytest moto
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest moto
       - name: Run tests
         run: pytest tests/unit/ -v --tb=short
 
@@ -49,13 +53,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Checkov
-        uses: bridgecrewio/checkov-action@master
+      - name: Checkov (pinned)
+        uses: bridgecrewio/checkov-action@v12.250.0
         with:
           directory: ./
           framework: terraform
-      - name: CodeQL
+      - name: CodeQL Init
         uses: github/codeql-action/init@v3
         with:
           languages: python, javascript
-      - uses: github/codeql-action/analyze@v3
+      - name: CodeQL Analyze
+        uses: github/codeql-action/analyze@v3
