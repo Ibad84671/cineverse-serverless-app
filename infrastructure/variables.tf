@@ -17,11 +17,14 @@ variable "table_name" {
 }
 
 variable "alert_email" {
-  description = "Email address for CloudWatch alarms"
+  description = "Email address for CloudWatch alarm notifications"
   type        = string
-  default     = "admin@example.com"
-}
 
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
+    error_message = "alert_email must be a valid email address."
+  }
+}
 variable "tags" {
   description = "Common tags"
   type        = map(string)

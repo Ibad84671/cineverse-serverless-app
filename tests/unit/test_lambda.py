@@ -134,3 +134,128 @@ def test_handler_get_single_movie_not_found(mock_table):
     event = {"httpMethod": "GET", "path": "/movies/1", "pathParameters": {"movie_id": "1"}}
     response = lambda_handler(event, None)
     assert response["statusCode"] == 404
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_post_requires_auth(mock_auth, mock_table):
+    mock_auth.return_value = None
+    event = {"httpMethod": "POST", "body": "{}"}
+    response = lambda_handler(event, None)
+    assert response["statusCode"] == 401
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_post_valid(mock_auth, mock_table):
+    mock_auth.return_value = "user-123"
+    mock_table.put_item.return_value = {}
+    event = {
+        "httpMethod": "POST",
+        "body": json.dumps({"MovieName": "Inception", "Rating": 9.2})
+    }
+    response = lambda_handler(event, None)
+    assert response["statusCode"] == 201
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_post_invalid(mock_auth, mock_table):
+    mock_auth.return_value = "user-123"
+    event = {"httpMethod": "POST", "body": "not json"}
+    response = lambda_handler(event, None)
+    assert response["statusCode"] == 400
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_put_owner(mock_auth, mock_table):
+    mock_auth.return_value = "user-123"
+    mock_table.get_item.return_value = {"Item": {"createdBy": "user-123"}}
+    mock_table.update_item.return_value = {"Attributes": {}}
+    event = {
+        "httpMethod": "PUT",
+        "pathParameters": {"movie_id": "1"},
+        "body": json.dumps({"MovieName": "Updated"})
+    }
+    response = lambda_handler(event, None)
+    assert response["statusCode"] == 200
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_put_other_user(mock_auth, mock_table):
+    mock_auth.return_value = "user-456"
+    mock_table.get_item.return_value = {"Item": {"createdBy": "user-123"}}
+    event = {
+        "httpMethod": "PUT",
+        "pathParameters": {"movie_id": "1"},
+        "body": json.dumps({"MovieName": "Updated"})
+    }
+    response = lambda_handler(event, None)
+    assert response["statusCode"] == 403
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_put_admin(mock_auth, mock_table):
+    mock_auth.return_value = "user-456"
+    mock_table.get_item.return_value = {"Item": {"createdBy": "user-123"}}
+    mock_table.update_item.return_value = {"Attributes": {}}
+    with patch('lambda_function.is_admin') as mock_admin:
+        mock_admin.return_value = True
+        event = {
+            "httpMethod": "PUT",
+            "pathParameters": {"movie_id": "1"},
+            "body": json.dumps({"MovieName": "Updated"})
+        }
+        response = lambda_handler(event, None)
+        assert response["statusCode"] == 200
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_put_missing_movie(mock_auth, mock_table):
+    mock_auth.return_value = "user-123"
+    mock_table.get_item.return_value = {}
+    event = {
+        "httpMethod": "PUT",
+        "pathParameters": {"movie_id": "1"},
+        "body": json.dumps({"MovieName": "Updated"})
+    }
+    response = lambda_handler(event, None)
+    assert response["statusCode"] == 404
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_delete_admin(mock_auth, mock_table):
+    mock_auth.return_value = "user-456"
+    mock_table.delete_item.return_value = {"Attributes": {}}
+    with patch('lambda_function.is_admin') as mock_admin:
+        mock_admin.return_value = True
+        event = {
+            "httpMethod": "DELETE",
+            "pathParameters": {"movie_id": "1"}
+        }
+        response = lambda_handler(event, None)
+        assert response["statusCode"] == 200
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_delete_non_admin(mock_auth, mock_table):
+    mock_auth.return_value = "user-123"
+    with patch('lambda_function.is_admin') as mock_admin:
+        mock_admin.return_value = False
+        event = {
+            "httpMethod": "DELETE",
+            "pathParameters": {"movie_id": "1"}
+        }
+        response = lambda_handler(event, None)
+        assert response["statusCode"] == 403
+
+@patch('lambda_function.table')
+@patch('lambda_function.get_authenticated_user')
+def test_handler_delete_missing_movie(mock_auth, mock_table):
+    mock_auth.return_value = "user-456"
+    mock_table.delete_item.return_value = {}
+    with patch('lambda_function.is_admin') as mock_admin:
+        mock_admin.return_value = True
+        event = {
+            "httpMethod": "DELETE",
+            "pathParameters": {"movie_id": "1"}
+        }
+        response = lambda_handler(event, None)
+        assert response["statusCode"] == 404

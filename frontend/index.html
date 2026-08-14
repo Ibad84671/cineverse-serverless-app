@@ -161,6 +161,7 @@
             }).join('');
         }
 
+        // ─── ADD BUTTON EVENT LISTENER ─────────────────────────────────
         document.getElementById('addBtn').addEventListener('click', () => {
             const name = document.getElementById('movieName').value.trim();
             const year = document.getElementById('releaseYear').value;
@@ -179,6 +180,7 @@
             document.getElementById('genre').value = '';
         });
 
+        // ─── INIT ──────────────────────────────────────────────────────
         fetchMovies();
     </script>
 </body>
