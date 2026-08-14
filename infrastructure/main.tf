@@ -1,10 +1,28 @@
 terraform {
   required_version = "~> 1.6"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+  }
+
+  backend "s3" {
+    # Replace these with your actual state bucket
+    bucket       = "cineverse-terraform-state"
+    key          = "cineverse/dev/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
   }
 }
 
@@ -26,6 +44,54 @@ resource "aws_s3_bucket_public_access_block" "frontend" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket_versioning" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_ownership_controls" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+# ─── S3 BUCKET POLICY FOR CLOUDFRONT OAC ────────────────────────────
+resource "aws_s3_bucket_policy" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontRead"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.frontend.arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
 # ─── CLOUDFRONT ──────────────────────────────────────────────────────
 resource "aws_cloudfront_origin_access_control" "frontend" {
   name                              = "${var.project_name}-oac"
@@ -38,11 +104,13 @@ resource "aws_cloudfront_origin_access_control" "frontend" {
 resource "aws_cloudfront_distribution" "frontend" {
   enabled             = true
   default_root_object = "index.html"
+
   origin {
     domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
     origin_id                = "S3-Frontend"
     origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
   }
+
   default_cache_behavior {
     target_origin_id = "S3-Frontend"
     viewer_protocol_policy = "redirect-to-https"
@@ -57,14 +125,17 @@ resource "aws_cloudfront_distribution" "frontend" {
       cookies { forward = "none" }
     }
   }
+
   restrictions {
     geo_restriction {
       restriction_type = "none"
     }
   }
+
   viewer_certificate {
     cloudfront_default_certificate = true
   }
+
   tags = var.tags
 }
 
@@ -190,6 +261,13 @@ resource "random_id" "suffix" {
   byte_length = 4
 }
 
+# ─── COGNITO ADMIN GROUP ────────────────────────────────────────────
+resource "aws_cognito_user_group" "admins" {
+  name         = "admins"
+  user_pool_id = aws_cognito_user_pool.this.id
+  description  = "Cineverse administrators"
+}
+
 # ─── API GATEWAY ────────────────────────────────────────────────────
 resource "aws_api_gateway_rest_api" "api" {
   name        = "${var.project_name}-api"
@@ -266,7 +344,7 @@ resource "aws_api_gateway_integration" "movies_post" {
   uri                     = aws_lambda_function.movies.invoke_arn
 }
 
-# ─── PUT (authenticated) ───────────────────────────────────────────
+# ─── PUT (authenticated + owner) ──────────────────────────────────
 resource "aws_api_gateway_method" "movie_put" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.movie_item.id
@@ -283,7 +361,7 @@ resource "aws_api_gateway_integration" "movie_put" {
   uri                     = aws_lambda_function.movies.invoke_arn
 }
 
-# ─── DELETE (authenticated + admin) ───────────────────────────────
+# ─── DELETE (admin only) ───────────────────────────────────────────
 resource "aws_api_gateway_method" "movie_delete" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.movie_item.id
@@ -300,7 +378,7 @@ resource "aws_api_gateway_integration" "movie_delete" {
   uri                     = aws_lambda_function.movies.invoke_arn
 }
 
-# ─── OPTIONS (CORS) ────────────────────────────────────────────────
+# ─── OPTIONS (CORS) with proper headers ────────────────────────────
 resource "aws_api_gateway_method" "movies_options" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.movies.id
@@ -313,7 +391,27 @@ resource "aws_api_gateway_integration" "movies_options" {
   http_method = aws_api_gateway_method.movies_options.http_method
   type        = "MOCK"
   request_templates = { "application/json" = "{\"statusCode\": 200}" }
+  integration_responses {
+    status_code = "200"
+    response_parameters = {
+      "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+      "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+      "method.response.header.Access-Control-Allow-Origin"  = var.allowed_origin
+    }
+  }
 }
+resource "aws_api_gateway_method_response" "movies_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.movies.id
+  http_method = aws_api_gateway_method.movies_options.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
 resource "aws_api_gateway_method" "movie_options" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.movie_item.id
@@ -326,9 +424,28 @@ resource "aws_api_gateway_integration" "movie_options" {
   http_method = aws_api_gateway_method.movie_options.http_method
   type        = "MOCK"
   request_templates = { "application/json" = "{\"statusCode\": 200}" }
+  integration_responses {
+    status_code = "200"
+    response_parameters = {
+      "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+      "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+      "method.response.header.Access-Control-Allow-Origin"  = var.allowed_origin
+    }
+  }
+}
+resource "aws_api_gateway_method_response" "movie_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.movie_item.id
+  http_method = aws_api_gateway_method.movie_options.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
 }
 
-# ─── DEPLOYMENT ─────────────────────────────────────────────────────
+# ─── API THROTTLING ────────────────────────────────────────────────
 resource "aws_api_gateway_deployment" "prod" {
   depends_on = [
     aws_api_gateway_integration.movies_get,
@@ -343,6 +460,21 @@ resource "aws_api_gateway_deployment" "prod" {
   stage_name  = "dev"
 }
 
+resource "aws_api_gateway_stage" "dev" {
+  stage_name    = "dev"
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  deployment_id = aws_api_gateway_deployment.prod.id
+
+  method_settings {
+    resource_path = "/*/*"
+    http_method   = "*"
+    metrics_enabled = true
+    logging_level   = "INFO"
+    throttling_burst_limit = 20
+    throttling_rate_limit  = 10
+  }
+}
+
 resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
@@ -352,6 +484,16 @@ resource "aws_lambda_permission" "api_gateway" {
 }
 
 # ─── CLOUDWATCH ALARMS ─────────────────────────────────────────────
+resource "aws_sns_topic" "alerts" {
+  name = "${var.project_name}-alerts"
+}
+
+resource "aws_sns_topic_subscription" "email" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}
+
 resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   alarm_name = "${var.project_name}-lambda-errors"
   comparison_operator = "GreaterThanThreshold"
@@ -362,8 +504,24 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   statistic = "Sum"
   threshold = 1
   alarm_description = "Lambda function errors"
+  alarm_actions = [aws_sns_topic.alerts.arn]
   dimensions = { FunctionName = aws_lambda_function.movies.function_name }
 }
+
+resource "aws_cloudwatch_metric_alarm" "lambda_throttles" {
+  alarm_name = "${var.project_name}-lambda-throttles"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods = 1
+  metric_name = "Throttles"
+  namespace = "AWS/Lambda"
+  period = 300
+  statistic = "Sum"
+  threshold = 1
+  alarm_description = "Lambda function throttles"
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  dimensions = { FunctionName = aws_lambda_function.movies.function_name }
+}
+
 resource "aws_cloudwatch_metric_alarm" "api_5xx" {
   alarm_name = "${var.project_name}-api-5xx"
   comparison_operator = "GreaterThanThreshold"
@@ -374,25 +532,23 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
   statistic = "Sum"
   threshold = 1
   alarm_description = "API Gateway 5xx errors"
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  dimensions = { ApiName = aws_api_gateway_rest_api.api.name }
+}
+
+resource "aws_cloudwatch_metric_alarm" "api_4xx" {
+  alarm_name = "${var.project_name}-api-4xx"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods = 1
+  metric_name = "4XXError"
+  namespace = "AWS/ApiGateway"
+  period = 300
+  statistic = "Sum"
+  threshold = 10
+  alarm_description = "API Gateway 4xx errors (spike)"
+  alarm_actions = [aws_sns_topic.alerts.arn]
   dimensions = { ApiName = aws_api_gateway_rest_api.api.name }
 }
 
 # ─── DATA SOURCES ──────────────────────────────────────────────────
 data "aws_caller_identity" "current" {}
-
-# ─── OUTPUTS ──────────────────────────────────────────────────────
-output "bucket_name" {
-  value = aws_s3_bucket.frontend.id
-}
-output "api_url" {
-  value = "${aws_api_gateway_deployment.prod.invoke_url}/movies"
-}
-output "cloudfront_url" {
-  value = aws_cloudfront_distribution.frontend.domain_name
-}
-output "user_pool_id" {
-  value = aws_cognito_user_pool.this.id
-}
-output "user_pool_client_id" {
-  value = aws_cognito_user_pool_client.this.id
-}

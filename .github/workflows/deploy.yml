@@ -10,22 +10,24 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
+      - name: Terraform Init
+        run: cd infrastructure && terraform init
       - name: Terraform Plan
-        run: |
-          cd infrastructure
-          terraform init
-          terraform plan -out=tfplan
+        run: cd infrastructure && terraform plan -out=tfplan
       - name: Terraform Apply
-        run: |
-          cd infrastructure
-          terraform apply tfplan
+        run: cd infrastructure && terraform apply tfplan
       - name: Sync Frontend to S3
         run: |
           BUCKET=$(terraform -chdir=infrastructure output -raw bucket_name)
           aws s3 sync frontend/ s3://$BUCKET/
+      - name: Create CloudFront Invalidation
+        run: |
+          DIST_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Aliases.Items[0]=='$(terraform -chdir=infrastructure output -raw cloudfront_url | cut -d'.' -f1).cloudfront.net']" --output text)
+          aws cloudfront create-invalidation --distribution-id $DIST_ID --paths "/*"

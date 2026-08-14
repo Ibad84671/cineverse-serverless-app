@@ -17,7 +17,7 @@ jobs:
       - name: Install dev dependencies
         run: |
           pip install -r backend/requirements.txt
-          pip install flake8 pytest moto
+          pip install -r backend/requirements-dev.txt
       - name: Lint Python
         run: flake8 backend/lambda_function.py --max-line-length=120 --ignore=F403,F405,W503
 
@@ -28,12 +28,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install dependencies
+      - name: Install dev dependencies
         run: |
           pip install -r backend/requirements.txt
-          pip install pytest moto
-      - name: Run tests
-        run: pytest tests/unit/ -v --tb=short
+          pip install -r backend/requirements-dev.txt
+      - name: Run tests with coverage
+        run: |
+          pytest tests/unit/ -v --cov=backend --cov-report=term-missing --cov-fail-under=80
 
   terraform:
     runs-on: ubuntu-latest
@@ -53,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Checkov (pinned)
+      - name: Checkov
         uses: bridgecrewio/checkov-action@v12.250.0
         with:
           directory: ./

@@ -28,6 +28,16 @@ def test_validate_movie_year_out_of_range():
     errors = validate_movie(data)
     assert any("between 1900" in e for e in errors)
 
+def test_validate_movie_rating_string():
+    data = {"MovieName": "Test", "Rating": "not-a-number"}
+    errors = validate_movie(data)
+    assert any("number" in e for e in errors)
+
+def test_validate_movie_name_non_string():
+    data = {"MovieName": 123}
+    errors = validate_movie(data)
+    assert any("string" in e for e in errors)
+
 def test_get_authenticated_user_valid():
     event = {"requestContext": {"authorizer": {"claims": {"sub": "user-123"}}}}
     assert get_authenticated_user(event) == "user-123"
@@ -41,4 +51,12 @@ def test_is_admin_true():
 
 def test_is_admin_false():
     event = {"requestContext": {"authorizer": {"claims": {"cognito:groups": "users"}}}}
+    assert is_admin(event) is False
+
+def test_is_admin_multiple_groups():
+    event = {"requestContext": {"authorizer": {"claims": {"cognito:groups": "users,admins,guests"}}}}
+    assert is_admin(event) is True
+
+def test_is_admin_empty():
+    event = {"requestContext": {"authorizer": {"claims": {}}}}
     assert is_admin(event) is False
