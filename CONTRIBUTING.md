@@ -11,9 +11,9 @@ Thanks for your interest! 🎬
 6. Push and open a Pull Request against `main`.
 
 ## Development Setup
-- Python 3.12+
-- Terraform 1.6+
+- Terraform 1.10+
 - AWS CLI configured
+- Python 3.12+
 
 ## PR Requirements
 - Code passes linting

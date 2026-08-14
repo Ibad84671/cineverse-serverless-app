@@ -214,14 +214,19 @@ allowed_origin  = "https://your-cloudfront-url"   # will be shown after apply
 
 > **Note:** `allowed_origin` must be an HTTPS URL (CloudFront will provide it after deployment).
 
-### 🏗️ 3. Initialize & Deploy
+## 🚀 Deployment
 
+### CI/CD Pipeline
+The CI/CD pipeline generates `frontend/config.js` automatically from the Terraform API Gateway output during deployment.
+
+For local development, copy `frontend/config.example.js` to `frontend/config.js` and provide the API endpoint manually.
+
+### Deploy Infrastructure
 ```bash
 cd infrastructure
 terraform init
-terraform validate
 terraform plan
-terraform apply
+terraform apply -auto-approve
 ```
 
 Type `yes` when prompted.
