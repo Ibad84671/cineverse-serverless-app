@@ -55,26 +55,37 @@ flowchart TD
     Client -->|"JWT Validation"| Lambda
     Lambda -->|"CRUD Operations"| DB
     Lambda -->|"Logs & Metrics"| CW
-🔄 Traffic Flow
-Step	Source	Destination	Port/Protocol	Direction
-1	Internet	CloudFront	HTTPS :443	Inbound
-2	CloudFront	Private S3	OAC (HTTPS)	Internal
-3	Browser (JS)	API Gateway	HTTPS :443	Inbound
-4	API Gateway	Lambda (GET)	AWS Proxy	Internal
-5	Lambda	DynamoDB	HTTPS	Internal
-6	Browser (JS)	Cognito	HTTPS	Auth
-🏗️ Infrastructure Tiers
-Tier	Service	Placement	Purpose
-Presentation	CloudFront + S3	Edge + Private Bucket	Serve static UI globally with HTTPS
-API	API Gateway REST API	Regional	Expose REST endpoints with Cognito auth
-Compute	AWS Lambda	Serverless	Execute business logic, validate input
-Data	DynamoDB	Serverless	Store movie catalog with PITR
-Authentication	Cognito User Pool	Managed	User sign‑up / sign‑in with email verification
-Monitoring	CloudWatch	Managed	Logging, metrics, and alarms
-📂 Repository Structure
+```
+
+### 🔄 Traffic Flow
+
+| Step | Source | Destination | Port/Protocol | Direction |
+|------|--------|-------------|---------------|-----------|
+| 1 | Internet | CloudFront | HTTPS :443 | Inbound |
+| 2 | CloudFront | Private S3 | OAC (HTTPS) | Internal |
+| 3 | Browser (JS) | API Gateway | HTTPS :443 | Inbound |
+| 4 | API Gateway | Lambda (GET) | AWS Proxy | Internal |
+| 5 | Lambda | DynamoDB | HTTPS | Internal |
+| 6 | Browser (JS) | Cognito | HTTPS | Auth |
+
+### 🏗️ Infrastructure Tiers
+
+| Tier | Service | Placement | Purpose |
+|------|---------|-----------|---------|
+| **Presentation** | CloudFront + S3 | Edge + Private Bucket | Serve static UI globally with HTTPS |
+| **API** | API Gateway REST API | Regional | Expose REST endpoints with Cognito auth |
+| **Compute** | AWS Lambda | Serverless | Execute business logic, validate input |
+| **Data** | DynamoDB | Serverless | Store movie catalog with PITR |
+| **Authentication** | Cognito User Pool | Managed | User sign‑up / sign‑in with email verification |
+| **Monitoring** | CloudWatch | Managed | Logging, metrics, and alarms |
+
+---
+
+## 📂 Repository Structure
+
 The project follows a clean, decoupled layout:
 
-text
+```
 cineverse-serverless-app/
 ├── .github/
 │   └── workflows/
@@ -98,20 +109,28 @@ cineverse-serverless-app/
 ├── SECURITY.md
 ├── LICENSE
 └── README.md                    # This file
-🔒 Security & Best Practices Implemented
-Category	Implementation
-Frontend Security	S3 bucket is private (Block Public Access) – only CloudFront OAC can read
-CDN Security	CloudFront with Origin Access Control (OAC) and HTTPS‑only viewer policy
-API Authentication	Cognito User Pool + Client – POST/PUT/DELETE require valid JWT
-API Authorization	DELETE restricted to users in the admins Cognito group
-Secrets Management	No hardcoded credentials – CI uses GitHub OIDC, Lambda uses environment variables
-Input Validation	Movie name, rating, year, and allowed update fields are validated server‑side
-XSS Protection	Frontend uses textContent for dynamic content rendering
-IAM Least Privilege	Lambda role grants only required DynamoDB actions on the specific table
-Encryption	DynamoDB encryption at rest (AWS‑managed)
-Backup	DynamoDB Point‑in‑Time Recovery (PITR) enabled
-🔐 Authorization Flow
-text
+```
+
+---
+
+## 🔒 Security & Best Practices Implemented
+
+| Category | Implementation |
+|----------|----------------|
+| **Frontend Security** | S3 bucket is **private** (Block Public Access) – only CloudFront OAC can read |
+| **CDN Security** | CloudFront with **Origin Access Control (OAC)** and HTTPS‑only viewer policy |
+| **API Authentication** | Cognito User Pool + Client – POST/PUT/DELETE require valid JWT |
+| **API Authorization** | DELETE restricted to users in the `admins` Cognito group |
+| **Secrets Management** | No hardcoded credentials – CI uses GitHub OIDC, Lambda uses environment variables |
+| **Input Validation** | Movie name, rating, year, and allowed update fields are validated server‑side |
+| **XSS Protection** | Frontend uses `textContent` for dynamic content rendering |
+| **IAM Least Privilege** | Lambda role grants only required DynamoDB actions on the specific table |
+| **Encryption** | DynamoDB encryption at rest (AWS‑managed) |
+| **Backup** | DynamoDB Point‑in‑Time Recovery (PITR) enabled |
+
+### 🔐 Authorization Flow
+
+```
 Internet
     │
     ▼
@@ -146,120 +165,167 @@ Internet
 │ 🔒 Only Lambda IAM role can access  │
 │ 🔒 PITR enabled                     │
 └─────────────────────────────────────┘
-🛠️ Technology Stack
-Component	Technology	Version
-Infrastructure	Terraform	1.6+
-Cloud Provider	AWS	-
-Frontend Hosting	S3 + CloudFront (OAC)	-
-API	API Gateway REST API	-
-Compute	AWS Lambda (Python)	3.12
-Database	DynamoDB	PAY_PER_REQUEST
-Authentication	Cognito User Pool	-
-CI/CD	GitHub Actions (OIDC)	-
-Security Scanning	Checkov, CodeQL	-
-Monitoring	CloudWatch Logs + Alarms	-
-🚀 Step‑by‑Step Deployment Guide
-📋 Prerequisites
-AWS CLI configured (aws configure) with appropriate IAM permissions
+```
 
-Terraform CLI (v1.6+) installed
+---
 
-Git installed
+## 🛠️ Technology Stack
 
-📥 1. Clone the Repository
-bash
+| Component | Technology | Version |
+|-----------|------------|---------|
+| **Infrastructure** | Terraform | 1.6+ |
+| **Cloud Provider** | AWS | - |
+| **Frontend Hosting** | S3 + CloudFront (OAC) | - |
+| **API** | API Gateway REST API | - |
+| **Compute** | AWS Lambda (Python) | 3.12 |
+| **Database** | DynamoDB | PAY_PER_REQUEST |
+| **Authentication** | Cognito User Pool | - |
+| **CI/CD** | GitHub Actions (OIDC) | - |
+| **Security Scanning** | Checkov, CodeQL | - |
+| **Monitoring** | CloudWatch Logs + Alarms | - |
+
+---
+
+## 🚀 Step‑by‑Step Deployment Guide
+
+### 📋 Prerequisites
+
+- AWS CLI configured (`aws configure`) with appropriate IAM permissions
+- Terraform CLI (v1.6+) installed
+- Git installed
+
+### 📥 1. Clone the Repository
+
+```bash
 git clone https://github.com/Ibad84671/cineverse-serverless-app.git
 cd cineverse-serverless-app
-⚙️ 2. Configure Environment Variables
-Create a terraform.tfvars file inside the infrastructure/ directory:
+```
 
-hcl
+### ⚙️ 2. Configure Environment Variables
+
+Create a `terraform.tfvars` file inside the `infrastructure/` directory:
+
+```hcl
 # infrastructure/terraform.tfvars
 aws_region      = "us-east-1"
 project_name    = "cineverse"
 allowed_origin  = "https://your-cloudfront-url"   # will be shown after apply
-Note: allowed_origin must be an HTTPS URL (CloudFront will provide it after deployment).
+```
 
-🏗️ 3. Initialize & Deploy
-bash
+> **Note:** `allowed_origin` must be an HTTPS URL (CloudFront will provide it after deployment).
+
+### 🏗️ 3. Initialize & Deploy
+
+```bash
 cd infrastructure
 terraform init
 terraform validate
 terraform plan
 terraform apply
-Type yes when prompted.
+```
 
-🌐 4. Access the Application
+Type `yes` when prompted.
+
+### 🌐 4. Access the Application
+
 Once deployment completes, get the CloudFront URL:
 
-bash
+```bash
 terraform output cloudfront_url
+```
+
 Open the URL in your browser:
-
-text
+```
 https://<cloudfront-id>.cloudfront.net
-🔐 5. Create a Cognito User
-Go to AWS Console → Cognito → User Pools → Your pool
+```
 
-Create a user (email/password)
+### 🔐 5. Create a Cognito User
 
-Confirm the user (or use admin set password)
+- Go to AWS Console → Cognito → User Pools → Your pool
+- Create a user (email/password)
+- Confirm the user (or use admin set password)
 
-🧹 6. Clean Up (Destroy Infrastructure)
-bash
+### 🧹 6. Clean Up (Destroy Infrastructure)
+
+```bash
 terraform destroy
-Type yes when prompted.
+```
 
-💰 Cost Estimation (us-east-1, Low Usage)
-Resource	Approx. Monthly
-S3 (static hosting)	< $0.01
-CloudFront	$0.01 – $0.05
-API Gateway	$0.01 – $0.05
-Lambda (Python 3.12)	< $0.01
-DynamoDB (PAY_PER_REQUEST)	< $0.01
-Cognito (50 MAU)	~$2.50
-CloudWatch Logs	< $0.01
-Total	~$2.50 – $3.00 / month
-⚙️ CI/CD Pipeline
-🔍 Continuous Integration (.github/workflows/ci.yml)
-Triggered on every push / pull request to main:
+Type `yes` when prompted.
 
-✅ Python linting (flake8)
+---
 
-✅ Unit tests (pytest + moto mocks)
+## 💰 Cost Estimation
 
-✅ Terraform fmt, validate
+| Resource | Approx. Monthly |
+|----------|-----------------|
+| S3 (static hosting) | < $0.01 |
+| CloudFront | $0.01 – $0.05 |
+| API Gateway | $0.01 – $0.05 |
+| Lambda (Python 3.12) | < $0.01 |
+| DynamoDB (PAY_PER_REQUEST) | < $0.01 |
+| Cognito (50 MAU) | ~$2.50 |
+| CloudWatch Logs | < $0.01 |
+| **Total** | **~$2.50 – $3.00 / month** |
 
-✅ Security scanning (Checkov, CodeQL)
+---
 
-🚀 Continuous Deployment (.github/workflows/deploy.yml)
-Triggered on push to main:
+## ⚙️ CI/CD Pipeline
 
-✅ Assumes AWS IAM role via OIDC (no long‑lived credentials)
+### 🔍 Continuous Integration (`.github/workflows/ci.yml`)
 
-✅ Terraform plan + apply
+Triggered on every push / pull request to `main`:
 
-✅ Syncs frontend to S3 bucket
+- ✅ Python linting (`flake8`)
+- ✅ Unit tests (`pytest` + `moto` mocks)
+- ✅ Terraform `fmt`, `validate`
+- ✅ Security scanning (Checkov, CodeQL)
 
-🧪 Testing & Validation
-Run Unit Tests Locally
-bash
+### 🚀 Continuous Deployment (`.github/workflows/deploy.yml`)
+
+Triggered on push to `main`:
+
+- ✅ Assumes AWS IAM role via **OIDC** (no long‑lived credentials)
+- ✅ Terraform `plan` + `apply`
+- ✅ Syncs frontend to S3 bucket
+
+---
+
+## 🧪 Testing & Validation
+
+### Run Unit Tests Locally
+
+```bash
 cd backend
 pip install -r requirements.txt
 pip install pytest moto
 python -m pytest ../tests/unit/ -v
-Validate Terraform
-bash
+```
+
+### Validate Terraform
+
+```bash
 cd infrastructure
 terraform fmt -check
 terraform validate
-📜 License
-Distributed under the MIT License. See LICENSE for more information.
+```
 
-🤝 Contributing
-Please read CONTRIBUTING.md for details.
+---
 
-🔒 Security
-Please read SECURITY.md for details on reporting security vulnerabilities.
+## 📜 License
 
-Made with ❤️ by Ibad
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+## 🤝 Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+## 🔒 Security
+
+Please read [SECURITY.md](SECURITY.md) for details on reporting security vulnerabilities.
+
+---
+
+**Made with ❤️ by Ibad**
