@@ -52,6 +52,7 @@ flowchart TD
 
     Lambda -->|"CRUD Operations"| DB[("DynamoDB<br/>MovieCatalog")]
     Lambda -->|"Logs & Metrics"| CW[CloudWatch<br/>Logs + Alarms]
+
 ## 📂 Repository Structure
 
 The project follows a clean, decoupled layout:
