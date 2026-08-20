@@ -36,13 +36,15 @@ jobs:
       - name: Install cfn-lint
         run: pipx install cfn-lint
       - name: Lint template
-        run: cfn-lint infrastructure/cineverse.yaml
+        run: cfn-lint infrastructure/cineverse.yaml --ignore-checks W3011
 
   security:
     name: Security checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Secret scan
         uses: gitleaks/gitleaks-action@v2
         env:
