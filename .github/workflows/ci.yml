@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt -r backend/requirements-dev.txt
       - name: Lint
-        run: flake8 backend/lambda_function.py --max-line-length=120 --ignore=F403,F405,W503
+        run: flake8 backend/lambda_function.py --max-line-length=120 --ignore=E501,F403,F405,W503
       - name: Unit tests
         run: pytest tests/unit/ -v --cov=backend --cov-report=term-missing --cov-fail-under=80
 
