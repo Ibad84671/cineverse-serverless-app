@@ -1,764 +1,259 @@
-# 🎬 Cineverse — Production-Inspired Serverless AWS Application
+# 🎬 CineVerse
 
-<p align="center">
-  <strong>Modern • Secure • Scalable • Serverless • Cloud-Native</strong>
-</p>
+> **Discover. Save. Rewatch.**
+>
+> A premium, serverless movie discovery platform built on AWS — with a cinematic frontend, real Cognito authentication, persistent watchlists, DynamoDB, API Gateway, Lambda, CloudFront and CloudFormation.
 
-<p align="center">
-  A production-inspired movie catalog application built on AWS using a modern serverless 3-tier architecture, Infrastructure as Code, authentication, CI/CD, security controls, and operational best practices.
-</p>
+[![CI](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml) [![AWS](https://img.shields.io/badge/AWS-Serverless-orange)](https://aws.amazon.com/serverless/) [![IaC](https://img.shields.io/badge/IaC-CloudFormation-blue)](https://aws.amazon.com/cloudformation/) [![License](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE)
 
-<p align="center">
+## What CineVerse is
 
-![CI](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-blue)
-![AWS](https://img.shields.io/badge/Cloud-AWS-orange)
-![Serverless](https://img.shields.io/badge/Architecture-Serverless-green)
-![Python](https://img.shields.io/badge/Backend-Python%203.12-yellow)
-![Terraform](https://img.shields.io/badge/IaC-Terraform-purple)
-![License](https://img.shields.io/badge/License-MIT-lightgrey)
+CineVerse keeps its original movie-catalog purpose but turns it into a polished discovery experience. Users can browse a catalog, search and filter titles, inspect cinematic details, sort by rating/year/title, and optionally sign in to persist a personal watchlist.
 
-</p>
+The recommendation experience is intentionally lightweight and transparent: discovery is driven by the catalog's genre, rating, year and metadata rather than an overstated “AI” claim.
 
----
+## ✨ Highlights
 
-## 📌 Table of Contents
+- Cinematic dark UI with a dedicated CineVerse design system
+- Responsive movie cards and accessible movie-detail dialog
+- Search with debounce plus genre/year/rating/sort filters
+- Pagination support for large DynamoDB catalogs
+- Real Amazon Cognito OAuth 2.0 Authorization Code + PKCE sign-in
+- Persistent per-user watchlist backed by DynamoDB
+- Owner/admin authorization for catalog mutations
+- Private S3 origin protected by CloudFront Origin Access Control
+- Regional API Gateway REST API + focused Lambda backend
+- Pay-per-request DynamoDB with point-in-time recovery
+- CloudWatch API/Lambda logging
+- CloudFormation as the infrastructure source of truth
+- One-command Bash and PowerShell deployment
+- GitHub Actions CI/CD with AWS OIDC for deployment
+- cfn-lint, pytest/coverage, CodeQL, Gitleaks and Checkov checks
+- Honest loading, empty, error and network-failure states
+- Reduced-motion support and keyboard search shortcut (`/`)
 
-- [Architecture Overview](#-architecture-overview)
-- [Architecture Diagram](#-architecture-diagram)
-- [Traffic Flow](#-traffic-flow)
-- [Repository Structure](#-repository-structure)
-- [Security & Best Practices](#-security--best-practices)
-- [Technology Stack](#-technology-stack)
-- [API Design](#-api-design)
-- [Data Model](#-data-model)
-- [Deployment Architecture](#-deployment-architecture)
-- [Step-by-Step Deployment](#-step-by-step-deployment)
-- [CI/CD Pipeline](#-cicd-pipeline)
-- [Testing & Validation](#-testing--validation)
-- [Monitoring & Operations](#-monitoring--operations)
-- [Cost Estimation](#-cost-estimation)
-- [Limitations](#-limitations)
-- [Roadmap](#-roadmap)
-- [License](#-license)
-
----
-
-# 🏛️ Architecture Overview
-
-Cineverse follows a modern **AWS serverless 3-tier architecture** designed around scalability, security, low operational overhead, and Infrastructure as Code.
-
-### Frontend Layer
-
-The frontend is a static web application hosted in a **private Amazon S3 bucket** and delivered globally through **Amazon CloudFront**.
-
-### API Layer
-
-The application exposes REST APIs through **Amazon API Gateway**.
-
-Public read operations are available for movie retrieval, while write operations require authentication through **Amazon Cognito**.
-
-### Compute Layer
-
-Business logic is implemented using **AWS Lambda with Python 3.12**.
-
-Lambda performs:
-
-- Request validation
-- Authentication handling
-- Movie CRUD operations
-- Input sanitization
-- DynamoDB interaction
-- Logging
-- Error handling
-
-### Data Layer
-
-Movie information is stored in **Amazon DynamoDB** using a serverless NoSQL architecture.
-
-Point-in-Time Recovery is enabled to improve data protection.
-
----
-
-# 🧩 Architecture Diagram
+## 🏗 Architecture
 
 ```mermaid
-flowchart TB
-
-    USER["🌐 Internet User"]
-
-    CF["☁️ Amazon CloudFront"]
-    S3["🪣 Private Amazon S3<br/>Static Frontend"]
-    
-    API["🚪 Amazon API Gateway<br/>REST API"]
-
-    COG["🔐 Amazon Cognito<br/>User Pool"]
-
-    LAMBDA["⚡ AWS Lambda<br/>Python 3.12"]
-
-    DB["🗄️ Amazon DynamoDB<br/>Movie Catalog"]
-
-    CW["📊 Amazon CloudWatch<br/>Logs & Metrics"]
-
-    USER -->|"HTTPS :443"| CF
-    CF -->|"Origin Access Control"| S3
-
-    USER -->|"HTTPS API Requests"| API
-
-    API -->|"GET /movies"| LAMBDA
-    API -->|"POST /movies"| LAMBDA
-    API -->|"PUT /movies/{id}"| LAMBDA
-    API -->|"DELETE /movies/{id}"| LAMBDA
-
-    USER -->|"Authentication"| COG
-    COG -->|"JWT Token"| USER
-
-    API -->|"JWT Authorization"| COG
-    LAMBDA -->|"CRUD Operations"| DB
-
-    LAMBDA -->|"Logs & Metrics"| CW
-
-    classDef user fill:#111827,stroke:#60a5fa,color:#fff;
-    classDef aws fill:#1f2937,stroke:#f59e0b,color:#fff;
-    classDef security fill:#1f2937,stroke:#ef4444,color:#fff;
-    classDef data fill:#1f2937,stroke:#22c55e,color:#fff;
-
-    class USER user;
-    class CF,S3,API,LAMBDA,CW aws;
-    class COG security;
-    class DB data;
+flowchart LR
+    U[User Browser] --> CF[CloudFront]
+    CF --> S3[Private S3 Frontend]
+    U --> API[API Gateway REST]
+    API --> L[Lambda Python 3.12]
+    L --> M[(DynamoDB Movie Catalog)]
+    L --> W[(DynamoDB User Watchlist)]
+    U --> C[Cognito Hosted UI]
+    C --> U
+    L --> CW[CloudWatch Logs]
 ```
 
----
+### Request flow
 
-# 🔄 Traffic Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as CloudFront/S3
+    participant A as API Gateway
+    participant L as Lambda
+    participant D as DynamoDB
+    U->>F: Open CineVerse
+    F-->>U: Static application
+    U->>A: GET /movies
+    A->>L: Invoke function
+    L->>D: Scan catalog page
+    D-->>L: Movie metadata
+    L-->>A: JSON response
+    A-->>U: Render discovery grid
+```
 
-| Step | Source | Destination | Protocol / Port | Purpose |
-|---:|---|---|---|---|
-| 1 | Internet User | CloudFront | HTTPS :443 | Secure frontend access |
-| 2 | CloudFront | Private S3 | HTTPS | Static frontend delivery |
-| 3 | Browser | API Gateway | HTTPS :443 | REST API requests |
-| 4 | API Gateway | Lambda | AWS Internal | Backend execution |
-| 5 | Lambda | DynamoDB | AWS Internal | Database operations |
-| 6 | Browser | Cognito | HTTPS | User authentication |
-| 7 | Lambda | CloudWatch | AWS Internal | Logs and metrics |
+### Auth + watchlist flow
 
----
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Cognito
+    participant F as CineVerse
+    participant A as API Gateway
+    participant L as Lambda
+    participant W as Watchlist Table
+    U->>F: Sign in
+    F->>C: Authorization Code + PKCE
+    C-->>F: Authorization code
+    F->>C: Exchange code for tokens
+    C-->>F: ID token
+    U->>A: PUT /watchlist/{movieId}
+    A->>A: Validate Cognito JWT
+    A->>L: Invoke authorized request
+    L->>W: Save UserId + MovieId
+    W-->>L: Success
+    L-->>U: Saved
+```
 
-# 🗂️ Repository Structure
+## ☁️ AWS services
+
+| Service | Role |
+|---|---|
+| Amazon S3 | Private static frontend origin |
+| Amazon CloudFront | Global HTTPS delivery + OAC |
+| API Gateway REST | Public/protected API surface |
+| AWS Lambda | Validation, business logic and persistence |
+| DynamoDB | Movie catalog + per-user watchlists |
+| Amazon Cognito | Hosted UI authentication and JWTs |
+| IAM | Least-privilege Lambda permissions |
+| CloudWatch Logs | API/Lambda operational logs |
+| CloudFormation | Complete infrastructure definition |
+
+No AWS service is present merely for architecture theatre; every component supports an implemented capability.
+
+## 🔌 API
+
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| GET | `/movies` | Public | Paginated catalog |
+| GET | `/movies/{movie_id}` | Public | Movie details |
+| POST | `/movies` | Cognito | Create a movie |
+| PUT | `/movies/{movie_id}` | Cognito | Owner/admin update |
+| DELETE | `/movies/{movie_id}` | Admin | Delete a movie |
+| GET | `/watchlist` | Cognito | Current user's saved films |
+| PUT | `/watchlist/{movie_id}` | Cognito | Save a film |
+| DELETE | `/watchlist/{movie_id}` | Cognito | Remove a film |
+
+Responses use a consistent `success`, `data`, `error` convention where practical. Internal exceptions are logged server-side without exposing implementation details to clients.
+
+## 📁 Repository structure
 
 ```text
 cineverse-serverless-app/
-│
-├── .github/
-│   └── workflows/
-│       ├── ci.yml
-│       └── deploy.yml
-│
+├── .github/workflows/
+│   ├── ci.yml
+│   └── deploy.yml
 ├── backend/
 │   ├── lambda_function.py
-│   └── requirements.txt
-│
+│   ├── requirements.txt
+│   └── requirements-dev.txt
+├── docs/
+│   ├── architecture.md
+│   ├── deployment.md
+│   ├── security.md
+│   └── operations.md
 ├── frontend/
 │   ├── index.html
+│   ├── styles.css
+│   ├── app.js
 │   ├── config.js
 │   └── config.example.js
-│
 ├── infrastructure/
-│   ├── main.tf
-│   ├── variables.tf
-│   └── outputs.tf
-│
-├── tests/
-│   └── unit/
-│       └── test_lambda.py
-│
-├── .gitignore
+│   └── cineverse.yaml
+├── scripts/
+│   ├── deploy.sh
+│   └── deploy.ps1
+├── tests/unit/test_lambda.py
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-└── SECURITY.md
+├── SECURITY.md
+└── README.md
 ```
 
----
+CloudFormation is now the deployment source of truth. The former Terraform implementation is intentionally retired rather than maintaining two competing IaC definitions.
 
-# 🔐 Security & Best Practices
+## 🚀 Deploy in one command
 
-Security is treated as a first-class component of the architecture.
+### Prerequisites
 
-| Category | Implementation |
-|---|---|
-| Frontend Security | Private S3 bucket |
-| CDN Security | CloudFront Origin Access Control |
-| Transport Security | HTTPS-only access |
-| Authentication | Amazon Cognito User Pool |
-| API Authorization | JWT-based authorization |
-| Input Validation | Server-side validation |
-| Secrets | GitHub OIDC + environment configuration |
-| IAM | Least-privilege Lambda role |
-| Database Security | DynamoDB encryption at rest |
-| Data Recovery | Point-in-Time Recovery |
-| Monitoring | CloudWatch Logs & Metrics |
-| CI Security | Automated security scanning |
+- AWS CLI v2
+- An AWS identity with permission to create the resources in `infrastructure/cineverse.yaml`
+- Bash/Git Bash **or** PowerShell
 
----
+Configure AWS credentials first (`aws configure`, SSO, or another approved credential provider). For GitHub Actions, use OIDC rather than long-lived access keys.
 
-# 🔒 Authentication & Authorization
+### Bash
 
-Cineverse uses **Amazon Cognito** for user authentication.
-
-### Public Operation
-
-```text
-GET /movies
+```bash
+export AWS_REGION=us-east-1
+./scripts/deploy.sh
 ```
 
-Users can retrieve movie information without performing an authenticated write operation.
+### PowerShell
 
-### Protected Operations
-
-```text
-POST /movies
-PUT /movies/{id}
-DELETE /movies/{id}
+```powershell
+$env:AWS_REGION = "us-east-1"
+.\scripts\deploy.ps1
 ```
 
-These operations require a valid Cognito-issued JWT.
+The script validates the template, deploys the CloudFormation stack, reads stack outputs, generates the runtime frontend configuration, uploads the frontend to private S3, invalidates CloudFront and prints the final URLs.
 
-The API validates the token before allowing protected operations.
+## 🔐 Authentication
 
----
+CineVerse uses Cognito's hosted UI with a public web client and Authorization Code + PKCE. The frontend does not contain an AWS secret and does not manufacture demo tokens. Tokens are held in `sessionStorage` for the browser session and sent only as bearer authorization to the protected API.
 
-# 🛡️ API Authorization Model
+The deployment creates the user pool, public client, hosted UI domain and `admins` group. An administrator can add users to the group through Cognito when catalog deletion privileges are required.
 
-```mermaid
-flowchart LR
+## 🛡 Security model
 
-    USER["👤 User"]
+- S3 blocks all public access; CloudFront OAC is the only frontend read path.
+- Lambda receives only the DynamoDB actions it needs.
+- Protected API methods use a Cognito user-pool authorizer.
+- Movie updates enforce owner-or-admin authorization in Lambda.
+- Deletes require the `admins` Cognito group.
+- DynamoDB encryption and point-in-time recovery are enabled.
+- CORS is restricted to the deployed CloudFront origin.
+- Secrets and AWS credentials are not committed.
+- CI scans for leaked secrets and performs CodeQL/Checkov analysis.
 
-    LOGIN["🔐 Cognito Login"]
+## ⚡ Performance choices
 
-    TOKEN["🎫 JWT Token"]
+The frontend uses lazy poster loading, debounced search, paginated API reads, lightweight DOM rendering, CloudFront compression/caching and no frontend framework dependency. The API uses DynamoDB on-demand capacity and avoids unnecessary external movie-API calls.
 
-    API["🚪 API Gateway"]
+## 🧪 Testing
 
-    AUTH["✅ JWT Validation"]
+Local backend checks:
 
-    LAMBDA["⚡ Lambda"]
-
-    DB["🗄️ DynamoDB"]
-
-    USER --> LOGIN
-    LOGIN --> TOKEN
-    TOKEN --> API
-    API --> AUTH
-    AUTH --> LAMBDA
-    LAMBDA --> DB
+```bash
+pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+pytest tests/unit/ -v --cov=backend --cov-report=term-missing
+flake8 backend/lambda_function.py --max-line-length=120 --ignore=F403,F405,W503
 ```
 
----
+Infrastructure:
 
-# 🚪 API Design
-
-| Method | Endpoint | Authentication | Purpose |
-|---|---|---|---|
-| GET | `/movies` | Public | Retrieve all movies |
-| GET | `/movies/{id}` | Public | Retrieve movie by ID |
-| POST | `/movies` | Required | Create a movie |
-| PUT | `/movies/{id}` | Required | Update a movie |
-| DELETE | `/movies/{id}` | Required | Delete a movie |
-
----
-
-# 🎬 Movie Data Model
-
-Example movie object:
-
-```json
-{
-  "id": "movie-001",
-  "name": "Example Movie",
-  "rating": 8.5,
-  "year": 2026
-}
+```bash
+cfn-lint infrastructure/cineverse.yaml
 ```
 
-### Supported Fields
+CI also runs CodeQL, Gitleaks, Checkov and frontend sanity checks.
 
-| Field | Type | Description |
-|---|---|---|
-| `id` | String | Unique movie identifier |
-| `name` | String | Movie name |
-| `rating` | Number | Movie rating |
-| `year` | Number | Release year |
+## 💰 Cost considerations
 
-Server-side validation is applied before database insertion or updates.
+CineVerse is designed for low operational overhead: S3, CloudFront, API Gateway, Lambda and DynamoDB are usage-based. DynamoDB uses on-demand billing. CloudWatch log retention defaults to 14 days. CloudFront uses `PriceClass_100` by default to keep a portfolio deployment cost-conscious.
 
----
+Actual AWS charges depend on requests, data transfer, Lambda duration, log volume, authentication activity and storage. Serverless does **not** mean universally free.
 
-# ⚙️ Backend Architecture
+## 🧹 Cleanup
 
-The backend is implemented using:
+The deployment script intentionally does not destroy resources. To remove a stack, review the resources and run:
 
-- Python 3.12
-- AWS Lambda
-- API Gateway
-- DynamoDB
-- Amazon Cognito
-- CloudWatch
-
-Lambda is responsible for:
-
-```text
-Request
-   ↓
-Validation
-   ↓
-Authentication Check
-   ↓
-Business Logic
-   ↓
-DynamoDB Operation
-   ↓
-Response
-   ↓
-CloudWatch Logging
+```bash
+aws cloudformation delete-stack --stack-name cineverse-prod --region us-east-1
 ```
 
----
+The S3 and DynamoDB resources use `Retain` policies so accidental stack deletion does not automatically destroy application data. Delete retained resources separately only when you are certain the data is no longer needed.
 
-# 🏗️ Infrastructure as Code
+## ⚠️ Known limitations
 
-The complete AWS infrastructure is defined using **Terraform**.
+- The catalog is backed by the application's own DynamoDB dataset; no third-party movie database is presented as an implemented dependency.
+- Recommendations are intentionally metadata/quality-driven rather than a machine-learning system.
+- The default deployment uses the CloudFront-provided hostname rather than a custom domain/ACM certificate.
+- Production-scale workloads may warrant WAF, stronger throttling, centralized dashboards, multi-environment promotion and automated disaster-recovery testing.
 
-Terraform manages:
+## 📚 Documentation
 
-- S3
-- CloudFront
-- API Gateway
-- Lambda
-- DynamoDB
-- Cognito
-- IAM
-- CloudWatch
-- Supporting resources
+- [Architecture](docs/architecture.md)
+- [Deployment](docs/deployment.md)
+- [Security](docs/security.md)
+- [Operations](docs/operations.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
 
-This makes infrastructure:
+## License
 
-- Reproducible
-- Version controlled
-- Reviewable
-- Automated
-- Consistent across environments
-
----
-
-# ☁️ Deployment Architecture
-
-```mermaid
-flowchart TB
-
-    DEV["👨‍💻 Developer"]
-
-    GIT["GitHub Repository"]
-
-    CI["GitHub Actions"]
-
-    TF["Terraform"]
-
-    AWS["☁️ AWS"]
-
-    S3["S3"]
-    CF["CloudFront"]
-    API["API Gateway"]
-    LAMBDA["Lambda"]
-    DB["DynamoDB"]
-    COG["Cognito"]
-
-    DEV --> GIT
-    GIT --> CI
-    CI --> TF
-    TF --> AWS
-
-    AWS --> S3
-    AWS --> CF
-    AWS --> API
-    AWS --> LAMBDA
-    AWS --> DB
-    AWS --> COG
-```
-
----
-
-# 🚀 Step-by-Step Deployment
-
-## 1. Clone the Repository
-
-Clone the repository locally and open the project directory.
-
-## 2. Configure AWS
-
-Configure AWS credentials for local Terraform operations.
-
-For CI/CD, use GitHub Actions with **OIDC-based AWS authentication** instead of storing long-lived AWS access keys.
-
-## 3. Configure Terraform Variables
-
-Review:
-
-```text
-infrastructure/variables.tf
-```
-
-Set the required environment-specific values.
-
-## 4. Initialize Terraform
-
-From the infrastructure directory, initialize Terraform.
-
-```text
-terraform init
-```
-
-## 5. Validate Configuration
-
-```text
-terraform validate
-```
-
-## 6. Review Infrastructure Changes
-
-```text
-terraform plan
-```
-
-## 7. Deploy Infrastructure
-
-```text
-terraform apply
-```
-
-## 8. Deploy Frontend
-
-Upload the frontend assets to the provisioned S3 bucket.
-
-CloudFront then serves the application globally.
-
-## 9. Configure Frontend API Endpoint
-
-Update the frontend configuration with the API Gateway endpoint generated by Terraform.
-
----
-
-# 🔁 CI/CD Pipeline
-
-The project includes GitHub Actions workflows for automated validation and deployment.
-
-### CI Pipeline
-
-```mermaid
-flowchart LR
-
-    PUSH["📤 Git Push"]
-
-    LINT["🔍 Lint"]
-
-    TEST["🧪 Unit Tests"]
-
-    TF["Terraform Validate"]
-
-    SECURITY["🛡️ Security Scan"]
-
-    RESULT["✅ Validation Passed"]
-
-    PUSH --> LINT
-    LINT --> TEST
-    TEST --> TF
-    TF --> SECURITY
-    SECURITY --> RESULT
-```
-
-### Deployment Pipeline
-
-```mermaid
-flowchart LR
-
-    MAIN["main branch"]
-
-    OIDC["🔐 GitHub OIDC"]
-
-    AWS["☁️ AWS"]
-
-    TF["Terraform"]
-
-    DEPLOY["🚀 Application Deployment"]
-
-    VERIFY["✅ Verification"]
-
-    MAIN --> OIDC
-    OIDC --> AWS
-    AWS --> TF
-    TF --> DEPLOY
-    DEPLOY --> VERIFY
-```
-
----
-
-# 🧪 Testing & Validation
-
-Unit tests are located under:
-
-```text
-tests/unit/
-```
-
-The project uses:
-
-- pytest
-- mocks
-- Terraform validation
-- linting
-- security scanning
-
-Recommended validation flow:
-
-```text
-Lint
-  ↓
-Unit Tests
-  ↓
-Terraform Validate
-  ↓
-Security Scan
-  ↓
-Deployment
-```
-
----
-
-# 📊 Monitoring & Operations
-
-Amazon CloudWatch provides operational visibility into the Lambda backend.
-
-Monitoring can include:
-
-- Lambda invocation count
-- Lambda errors
-- Lambda duration
-- API errors
-- Application logs
-- DynamoDB activity
-- Operational alarms
-
-Centralized logging makes troubleshooting easier without managing traditional servers.
-
----
-
-# 💰 Cost Estimation
-
-The architecture is designed around AWS serverless services, which means infrastructure cost is primarily usage-based.
-
-Main cost drivers include:
-
-| Service | Primary Cost Driver |
-|---|---|
-| CloudFront | Data transfer / requests |
-| S3 | Storage / requests |
-| API Gateway | API requests |
-| Lambda | Invocations / compute duration |
-| DynamoDB | Read/write capacity or on-demand usage |
-| Cognito | Monthly active users / authentication usage |
-| CloudWatch | Logs / metrics |
-
-Actual cost depends on:
-
-- Traffic
-- Number of API requests
-- Lambda execution time
-- Database usage
-- Frontend data transfer
-- Number of authenticated users
-
-For a low-traffic portfolio application, serverless architecture can keep infrastructure overhead relatively low.
-
----
-
-# 🧠 Why Serverless?
-
-Cineverse uses serverless architecture to avoid managing traditional application servers.
-
-### Benefits
-
-- Automatic scaling
-- No server provisioning
-- Pay-per-use model
-- Reduced infrastructure management
-- Built-in AWS availability
-- Easy automation
-- Strong integration with AWS services
-
----
-
-# ⚠️ Limitations
-
-This project is production-inspired but should not automatically be considered a fully production-hardened enterprise system.
-
-Potential areas for further improvement include:
-
-- Advanced API throttling
-- WAF integration
-- Multi-environment infrastructure
-- Custom domain configuration
-- Automated database migrations
-- Advanced observability
-- Distributed tracing
-- Disaster recovery strategy
-- Automated integration testing
-- Enhanced application-level rate limiting
-
----
-
-# 🗺️ Roadmap
-
-### Phase 1 — Foundation
-
-- [x] Serverless architecture
-- [x] Terraform infrastructure
-- [x] Lambda backend
-- [x] DynamoDB
-- [x] API Gateway
-- [x] Cognito authentication
-- [x] CloudFront frontend
-- [x] CI/CD foundation
-
-### Phase 2 — Security
-
-- [x] Private S3
-- [x] CloudFront OAC
-- [x] HTTPS-only access
-- [x] JWT authorization
-- [x] Least-privilege IAM
-- [x] Input validation
-
-### Phase 3 — Operations
-
-- [x] CloudWatch logging
-- [x] Automated testing
-- [x] Terraform validation
-- [x] Security scanning
-
-### Phase 4 — Future Enhancements
-
-- [ ] AWS WAF
-- [ ] Custom domain
-- [ ] Route 53 integration
-- [ ] Advanced monitoring dashboards
-- [ ] Distributed tracing
-- [ ] Multi-environment deployment
-- [ ] Blue/Green deployment
-- [ ] Automated rollback
-
----
-
-# 📚 Technology Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | HTML / JavaScript |
-| CDN | Amazon CloudFront |
-| Storage | Amazon S3 |
-| API | Amazon API Gateway |
-| Authentication | Amazon Cognito |
-| Compute | AWS Lambda |
-| Backend | Python 3.12 |
-| Database | Amazon DynamoDB |
-| Monitoring | Amazon CloudWatch |
-| Infrastructure | Terraform |
-| CI/CD | GitHub Actions |
-| Security | IAM / OIDC / JWT |
-| Testing | pytest |
-
----
-
-# 🎯 Project Goals
-
-Cineverse demonstrates how a modern application can combine:
-
-**Cloud Architecture**
-
-→ Serverless AWS services  
-→ Infrastructure as Code  
-→ Automated deployment  
-
-**Security**
-
-→ Cognito authentication  
-→ JWT authorization  
-→ Least-privilege IAM  
-→ Private S3  
-→ CloudFront OAC  
-
-**Engineering**
-
-→ Input validation  
-→ Unit testing  
-→ CI/CD  
-→ Monitoring  
-→ Reproducible infrastructure  
-
----
-
-# 👨‍💻 Engineering Principles
-
-This project follows these core principles:
-
-### 🔹 Infrastructure as Code
-
-Infrastructure should be reproducible and version controlled.
-
-### 🔹 Least Privilege
-
-AWS IAM permissions should grant only the access required by each component.
-
-### 🔹 Secure by Default
-
-Private storage, HTTPS, authentication, and server-side validation are preferred wherever practical.
-
-### 🔹 Automation First
-
-Testing, validation, security scanning, and deployment should be automated.
-
-### 🔹 Observability
-
-Application activity should be visible through centralized logging and metrics.
-
-### 🔹 Serverless First
-
-Use managed AWS services wherever they reduce operational complexity.
-
----
-
-# 📄 License
-
-This project is licensed under the **MIT License**.
-
-See the `LICENSE` file for complete license information.
-
----
-
-# ⭐ Project Summary
-
-**Cineverse** is a production-inspired AWS serverless application demonstrating how a modern cloud-native system can be designed using:
-
-**CloudFront + S3 + API Gateway + Cognito + Lambda + DynamoDB + CloudWatch + Terraform + GitHub Actions**
-
-The architecture emphasizes:
-
-> **Security • Scalability • Automation • Maintainability • Low Operational Overhead**
-
----
-
-<p align="center">
-  <strong>🎬 Cineverse</strong><br>
-  Production-Inspired Serverless AWS Architecture
-</p>
+MIT — see [LICENSE](LICENSE).
