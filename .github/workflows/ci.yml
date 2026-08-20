@@ -17,8 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+        with: {python-version: '3.12'}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -36,23 +35,20 @@ jobs:
       - name: Install cfn-lint
         run: pipx install cfn-lint
       - name: Lint template
-        run: cfn-lint infrastructure/cineverse.yaml --ignore-checks W3011
+        run: cfn-lint infrastructure/cineverse-v2.yaml
 
   security:
     name: Security checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: {fetch-depth: 0}
       - name: Secret scan
         uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env: {GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}}
       - name: CodeQL
         uses: github/codeql-action/init@v3
-        with:
-          languages: python, javascript
+        with: {languages: python, javascript}
       - name: CodeQL analyze
         uses: github/codeql-action/analyze@v3
       - name: Checkov CloudFormation scan
