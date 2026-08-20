@@ -1,4 +1,7 @@
-// ─── CONFIGURATION EXAMPLE ──────────────────────────────────────────
-// Copy this file to config.js and update the API URL for local development.
-
-const API_URL = 'https://YOUR-API-ID.execute-api.us-east-1.amazonaws.com/dev/movies';
+window.CINEVERSE_CONFIG = {
+  apiUrl: 'https://YOUR-API-ID.execute-api.YOUR-REGION.amazonaws.com/prod/movies',
+  cognitoDomain: 'https://YOUR-COGNITO-DOMAIN.auth.YOUR-REGION.amazoncognito.com',
+  clientId: 'YOUR_COGNITO_CLIENT_ID',
+  redirectUri: window.location.origin + '/',
+  logoutUri: window.location.origin + '/'
+};
