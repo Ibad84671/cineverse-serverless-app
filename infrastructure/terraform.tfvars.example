@@ -1,8 +1,0 @@
-# Copy this file to terraform.tfvars and update values
-
-aws_region   = "us-east-1"
-project_name = "cineverse"
-table_name   = "MovieCatalog"
-
-# Email for CloudWatch alarms – must be a valid email address
-alert_email = "your-email@example.com"
