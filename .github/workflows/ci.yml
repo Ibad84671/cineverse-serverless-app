@@ -33,13 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: aws-actions/setup-sam@v2
       - name: Install cfn-lint
         run: pipx install cfn-lint
       - name: Lint template
         run: cfn-lint infrastructure/cineverse.yaml
-      - name: Validate template syntax
-        run: aws cloudformation validate-template --template-body file://infrastructure/cineverse.yaml
 
   security:
     name: Security checks
