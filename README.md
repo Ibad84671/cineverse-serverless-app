@@ -1,10 +1,16 @@
 # 🎬 CineVerse
 
 > **Discover. Save. Rewatch.**
+>
+> **A premium serverless movie discovery platform built on AWS.**
 
-CineVerse is a premium serverless movie discovery platform that preserves the original movie-catalog goal while upgrading the product experience, authentication, persistence, security and AWS architecture.
+CineVerse turns a traditional movie catalog into a polished cinematic discovery experience while demonstrating production-minded AWS serverless engineering. It combines a responsive movie UI with secure Cognito authentication, persistent DynamoDB watchlists, API Gateway + Lambda APIs, CloudFront delivery, and CloudFormation infrastructure as code.
 
-[![CI](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml) ![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![IaC](https://img.shields.io/badge/IaC-CloudFormation-blue) ![License](https://img.shields.io/badge/License-MIT-lightgrey)
+[![CI](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml) ![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![IaC](https://img.shields.io/badge/IaC-CloudFormation-blue) ![Python](https://img.shields.io/badge/Backend-Python-3776AB) ![JavaScript](https://img.shields.io/badge/Frontend-JavaScript-F7DF1E) ![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
+**Core stack:** `S3` · `CloudFront` · `API Gateway` · `Lambda` · `DynamoDB` · `Cognito` · `IAM` · `CloudWatch` · `CloudFormation`
+
+**Repository positioning:** `Serverless` · `Movie Discovery` · `Cloud Architecture` · `Infrastructure as Code` · `AWS`
 
 ## ✨ Product experience
 
