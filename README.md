@@ -1,234 +1,137 @@
 # 🎬 CineVerse
 
-> **Discover. Save. Rewatch.**
->
-> **A premium serverless movie discovery platform built on AWS.**
+**Discover. Save. Rewatch.**
 
-CineVerse turns a traditional movie catalog into a polished cinematic discovery experience while demonstrating production-minded AWS serverless engineering. It combines a responsive movie UI with secure Cognito authentication, persistent DynamoDB watchlists, API Gateway + Lambda APIs, CloudFront delivery, and CloudFormation infrastructure as code.
+A premium serverless movie discovery platform built on AWS, combining a cinematic responsive interface with real cloud-backed catalog, authentication and personal watchlist features.
 
-[![CI](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Ibad84671/cineverse-serverless-app/actions/workflows/ci.yml) ![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![IaC](https://img.shields.io/badge/IaC-CloudFormation-blue) ![Python](https://img.shields.io/badge/Backend-Python-3776AB) ![JavaScript](https://img.shields.io/badge/Frontend-JavaScript-F7DF1E) ![License](https://img.shields.io/badge/License-MIT-lightgrey)
+![AWS](https://img.shields.io/badge/AWS-Serverless-orange?logo=amazon-aws)
+![CloudFormation](https://img.shields.io/badge/IaC-CloudFormation-ff9900?logo=amazon-aws)
+![Python](https://img.shields.io/badge/Backend-Python-3776AB?logo=python&logoColor=white)
+![JavaScript](https://img.shields.io/badge/Frontend-JavaScript-F7DF1E?logo=javascript&logoColor=111)
+![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=github-actions&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-**Core stack:** `S3` · `CloudFront` · `API Gateway` · `Lambda` · `DynamoDB` · `Cognito` · `IAM` · `CloudWatch` · `CloudFormation`
+## ✨ What CineVerse Does
 
-**Repository positioning:** `Serverless` · `Movie Discovery` · `Cloud Architecture` · `Infrastructure as Code` · `AWS`
+- 🎬 Browse and discover movies through a cinematic, responsive UI
+- 🔎 Search, filter and sort the movie catalog
+- ⭐ Explore ratings, genres, metadata and movie details
+- ♡ Save movies to a persistent personal watchlist
+- 🔐 Optional secure authentication with Amazon Cognito
+- ☁️ Run the application on AWS serverless services
+- 🏗️ Provision the deployment architecture with AWS CloudFormation
+- 🛡️ Apply least-privilege IAM, API authorization and security checks
 
-## ✨ Product experience
-
-- Cinematic dark interface with a focused CineVerse design system
-- Responsive movie cards with poster fallbacks, ratings and metadata
-- Search with debounce and genre/year/rating/sort filters
-- Movie detail dialog with overview and metadata
-- Pagination-aware catalog loading
-- Real Cognito Hosted UI sign-in using Authorization Code + PKCE
-- Persistent per-user watchlist
-- Owner/admin authorization for catalog mutations
-- Honest loading, empty and failure states
-- Keyboard `/` search shortcut and reduced-motion support
-
-Recommendations remain intentionally transparent: the current experience uses catalog metadata, quality and recency signals rather than claiming a fake AI engine.
-
-## ☁️ AWS architecture
+## ☁️ Architecture
 
 ```mermaid
 flowchart LR
     U[User] --> CF[CloudFront]
-    CF --> S3[Private S3]
-    U --> API[API Gateway REST]
-    API --> L[Lambda Python 3.12]
-    L --> M[(MovieCatalog)]
-    L --> W[(UserLibrary)]
+    CF --> S3[Private S3 Frontend]
     U --> C[Cognito Hosted UI]
+    U --> API[API Gateway]
+    API --> L[Lambda]
+    L --> M[(Movie Catalog DynamoDB)]
+    L --> W[(User Library DynamoDB)]
     L --> CW[CloudWatch Logs]
 ```
 
-### Request flow
+The infrastructure source of truth is `infrastructure/cineverse-v2.yaml`. The frontend is delivered through CloudFront from a private S3 origin, while API Gateway routes requests to focused Lambda logic backed by DynamoDB.
 
-```mermaid
-sequenceDiagram
-    participant U as Browser
-    participant F as CloudFront/S3
-    participant A as API Gateway
-    participant L as Lambda
-    participant D as DynamoDB
-    U->>F: Open CineVerse
-    F-->>U: Static application
-    U->>A: GET /movies
-    A->>L: Invoke
-    L->>D: Paginated catalog read
-    D-->>L: Movies
-    L-->>A: JSON
-    A-->>U: Discovery grid
-```
+## 🧱 Tech Stack
 
-### Authentication + watchlist
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant C as Cognito
-    participant F as CineVerse
-    participant A as API Gateway
-    participant L as Lambda
-    participant W as UserLibrary
-    U->>F: Sign in
-    F->>C: OAuth code + PKCE
-    C-->>F: Authorization code
-    F->>C: Token exchange
-    C-->>F: ID token
-    U->>A: PUT /watchlist/{movieId}
-    A->>L: Authorized request
-    L->>W: Save by UserId + MovieId
-    W-->>L: Success
-    L-->>U: Saved
-```
-
-## 🧩 AWS services
-
-| Service | Purpose |
+| Layer | Technology |
 |---|---|
-| S3 | Private static frontend origin |
-| CloudFront | HTTPS delivery + Origin Access Control |
-| API Gateway REST | Public/protected API surface |
-| Lambda | Validation, authorization and business logic |
-| DynamoDB | Movie catalog + user watchlists |
-| Cognito | Authentication and JWT issuance |
-| IAM | Least-privilege Lambda access |
-| CloudWatch | API access and Lambda logs |
-| CloudFormation | Complete infrastructure source of truth |
-
-## 🔌 API
-
-| Method | Route | Auth | Purpose |
-|---|---|---|---|
-| GET | `/movies` | Public | Paginated catalog |
-| GET | `/movies/{movie_id}` | Public | Movie details |
-| POST | `/movies` | Cognito | Create movie |
-| PUT | `/movies/{movie_id}` | Cognito | Owner/admin update |
-| DELETE | `/movies/{movie_id}` | Admin | Delete movie |
-| GET | `/watchlist` | Cognito | Current user's saved films |
-| PUT | `/watchlist/{movie_id}` | Cognito | Save film |
-| DELETE | `/watchlist/{movie_id}` | Cognito | Remove film |
+| Frontend | HTML, CSS, Vanilla JavaScript |
+| CDN / Web delivery | Amazon CloudFront + Amazon S3 |
+| API | Amazon API Gateway |
+| Compute | AWS Lambda + Python |
+| Database | Amazon DynamoDB |
+| Authentication | Amazon Cognito + OAuth 2.0 PKCE |
+| Infrastructure | AWS CloudFormation |
+| Observability | Amazon CloudWatch |
+| CI | GitHub Actions |
 
 ## 📁 Repository
 
 ```text
 cineverse-serverless-app/
-├── .github/workflows/
-│   ├── ci.yml
-│   └── deploy.yml
-├── backend/
-│   ├── lambda_function.py
-│   ├── requirements.txt
-│   └── requirements-dev.txt
-├── docs/
-├── frontend/
-│   ├── index.html
-│   ├── styles.css
-│   ├── app.js
-│   ├── config.js
-│   └── config.example.js
-├── infrastructure/
-│   └── cineverse-v2.yaml
-├── scripts/
-│   ├── deploy.sh
-│   └── deploy.ps1
-├── tests/unit/test_lambda.py
+├── frontend/                 # CineVerse web experience
+├── backend/                  # Lambda handlers and backend tests
+├── infrastructure/           # CloudFormation infrastructure
+├── scripts/                  # Deployment and validation helpers
+├── docs/                     # Architecture, security and deployment docs
+├── tests/                    # Project-level validation
+├── .github/workflows/        # CI/CD and security checks
+├── README.md
 ├── SECURITY.md
 ├── CONTRIBUTING.md
-├── CHANGELOG.md
-└── README.md
+└── LICENSE
 ```
 
-CloudFormation is the only infrastructure source of truth. Terraform has been retired rather than maintaining competing IaC definitions.
+## 🚀 Deployment
 
-## 🚀 One-command deployment
+CineVerse is designed so the AWS infrastructure can be recreated from CloudFormation rather than relying on undocumented console configuration.
 
 ### Prerequisites
 
-- AWS CLI v2
-- An AWS identity allowed to deploy the stack
-- Bash/Git Bash or PowerShell
+- AWS account
+- AWS CLI configured with suitable deployment permissions
+- Python 3.12+
+- Bash or PowerShell
+- A Cognito callback URL and movie data configuration where required
 
-### Bash
+### Validate
 
 ```bash
-export AWS_REGION=us-east-1
+./scripts/validate.sh
+```
+
+PowerShell users can use the matching `.ps1` scripts in `scripts/`.
+
+### Deploy
+
+```bash
 ./scripts/deploy.sh
 ```
 
-### PowerShell
+The deployment script validates the CloudFormation template, deploys the stack, waits for completion and reports the resulting outputs.
 
-```powershell
-$env:AWS_REGION = "us-east-1"
-.\scripts\deploy.ps1
-```
+> Never commit AWS credentials, Cognito secrets, API keys or other sensitive values. Use environment variables or AWS-managed identity/secrets mechanisms as documented in `docs/`.
 
-The scripts validate CloudFormation, deploy the stack, read outputs, generate `frontend/config.js`, publish the frontend to private S3 and invalidate CloudFront.
+## 🔐 Security
 
-The Cognito domain prefix defaults to `cineverse-<AWS-account-id>` so it is deterministic per account without committing a secret.
+Security is part of the architecture rather than an afterthought. The project includes authenticated API operations, least-privilege IAM policies, private S3 origin access through CloudFront, input validation, secure Cognito PKCE authentication and automated security checks.
 
-## 🔐 Authentication
+See [SECURITY.md](SECURITY.md) for reporting guidance and [docs/security.md](docs/security.md) for implementation details.
 
-CineVerse uses a Cognito public web client and OAuth 2.0 Authorization Code + PKCE. The browser never receives a Cognito client secret and never manufactures a fake authentication token. The API is protected by a Cognito user-pool authorizer.
+## 🧪 Quality & CI
 
-Catalog reads are public. Movie creation, updates and watchlist operations require authentication. Deletes require the `admins` Cognito group.
+GitHub Actions validates the project with application checks, infrastructure validation and security tooling. The repository is intentionally configured to fail on meaningful quality or security regressions instead of using placeholder tests solely to produce green builds.
 
-## 🛡 Security
+## 💰 Cost Awareness
 
-- S3 public access is blocked; CloudFront OAC is the read path.
-- DynamoDB is encrypted and protected with point-in-time recovery.
-- Lambda has only the DynamoDB and CloudWatch permissions it needs.
-- Cross-user watchlist access is prevented by the Cognito `sub` partition key.
-- Movie updates enforce owner-or-admin authorization in Lambda.
-- Client-rendered movie metadata is escaped before insertion into HTML.
-- No AWS credentials or private movie API keys are committed.
-- CI includes CodeQL, Gitleaks and Checkov.
-
-## ⚡ Performance
-
-The frontend uses lazy poster loading, debounced search, pagination, efficient filtering and minimal JavaScript dependencies. CloudFront provides compression and caching. DynamoDB uses pay-per-request capacity.
-
-## 🧪 Validation
-
-```bash
-pip install -r backend/requirements.txt -r backend/requirements-dev.txt
-pytest tests/unit/ -v --cov=backend --cov-report=term-missing
-flake8 backend/lambda_function.py --max-line-length=120 --ignore=E501,F403,F405,W503
-cfn-lint infrastructure/cineverse-v2.yaml
-```
-
-GitHub Actions additionally runs frontend sanity checks, CodeQL, Gitleaks and Checkov CloudFormation analysis.
-
-## 💰 Cost awareness
-
-CineVerse uses usage-based serverless services and DynamoDB on-demand capacity. CloudFront is configured with `PriceClass_100`; CloudWatch logs default to a 14-day retention period. Actual cost depends on traffic, API requests, Lambda duration, data transfer, logs, storage and authentication usage. Serverless is not automatically free.
-
-## 🧹 Cleanup
-
-Review retained data before deleting the stack:
-
-```bash
-aws cloudformation delete-stack --stack-name cineverse-prod --region us-east-1
-```
-
-S3 and DynamoDB use `Retain` policies so stack deletion does not automatically destroy application data.
-
-## ⚠️ Known limitations
-
-- The catalog is the application's own DynamoDB dataset; there is no hidden third-party movie API dependency.
-- Recommendations are metadata/quality-driven, not machine learning.
-- The default deployment uses the CloudFront hostname rather than a custom domain.
-- A larger public workload may warrant AWS WAF, stricter throttling, custom domains, multi-environment promotion and deeper observability.
+CineVerse uses managed/serverless AWS services to avoid always-on compute. Actual cost depends on traffic, CloudFront data transfer, Lambda/API usage, DynamoDB usage, CloudWatch logs and Cognito usage. Always review current AWS pricing and set appropriate budgets/alerts for real deployments.
 
 ## 📚 Documentation
 
 - [Architecture](docs/architecture.md)
 - [Deployment](docs/deployment.md)
+- [API](docs/api.md)
+- [Authentication](docs/authentication.md)
+- [Recommendations](docs/recommendations.md)
 - [Security](docs/security.md)
-- [Operations](docs/operations.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
+- [Development](docs/development.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
-## License
+## 🤝 Contributing
 
-MIT — see [LICENSE](LICENSE).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and contribution standards.
+
+## 📄 License
+
+Released under the MIT License. See [LICENSE](LICENSE).
+
+---
+
+**CineVerse** — a cloud-native movie discovery project designed to demonstrate practical AWS serverless engineering without unnecessary infrastructure complexity.
