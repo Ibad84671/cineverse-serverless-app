@@ -21,12 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+        with: {python-version: '3.12'}
       - name: Install CloudFormation linter
         run: pipx install cfn-lint
       - name: Validate infrastructure
-        run: cfn-lint infrastructure/cineverse.yaml
+        run: cfn-lint infrastructure/cineverse-v2.yaml
       - name: Configure AWS with OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -36,30 +35,14 @@ jobs:
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           DOMAIN_PREFIX="cineverse-${ACCOUNT_ID}"
-          aws cloudformation deploy \
-            --template-file infrastructure/cineverse.yaml \
-            --stack-name "$STACK_NAME" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --no-fail-on-empty-changeset \
-            --parameter-overrides ProjectName=cineverse EnvironmentName=prod CognitoDomainPrefix="$DOMAIN_PREFIX"
+          aws cloudformation deploy --template-file infrastructure/cineverse-v2.yaml --stack-name "$STACK_NAME" --capabilities CAPABILITY_NAMED_IAM --no-fail-on-empty-changeset --parameter-overrides ProjectName=cineverse EnvironmentName=prod CognitoDomainPrefix="$DOMAIN_PREFIX"
       - name: Publish frontend
         shell: bash
         run: |
           output(){ aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
-          BUCKET=$(output FrontendBucketName)
-          API_URL=$(output ApiUrl)
-          FRONTEND_URL=$(output FrontendUrl)
-          COGNITO_DOMAIN=$(output CognitoDomain)
-          CLIENT_ID=$(output CognitoClientId)
-          DIST_DOMAIN=$(output CloudFrontDomainName)
+          BUCKET=$(output FrontendBucketName); API_URL=$(output ApiUrl); FRONTEND_URL=$(output FrontendUrl); COGNITO_DOMAIN=$(output CognitoDomain); CLIENT_ID=$(output CognitoClientId); DIST_DOMAIN=$(output CloudFrontDomainName)
           cat > frontend/config.js <<EOF
-          window.CINEVERSE_CONFIG = {
-            apiUrl: "$API_URL",
-            cognitoDomain: "$COGNITO_DOMAIN",
-            clientId: "$CLIENT_ID",
-            redirectUri: "$FRONTEND_URL",
-            logoutUri: "$FRONTEND_URL"
-          };
+          window.CINEVERSE_CONFIG = { apiUrl: "$API_URL", cognitoDomain: "$COGNITO_DOMAIN", clientId: "$CLIENT_ID", redirectUri: "$FRONTEND_URL", logoutUri: "$FRONTEND_URL" };
           EOF
           aws s3 sync frontend/ "s3://$BUCKET/" --delete --exclude config.example.js --cache-control 'public,max-age=300'
           DIST_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?DomainName=='$DIST_DOMAIN'].Id | [0]" --output text)
