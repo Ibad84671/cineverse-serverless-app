@@ -1,50 +1,56 @@
-name: CD Pipeline
+name: CineVerse CD
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
   id-token: write
 
+env:
+  AWS_REGION: us-east-1
+  STACK_NAME: cineverse-prod
+
 jobs:
   deploy:
+    name: Deploy CineVerse
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.10.5
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install CloudFormation linter
+        run: pipx install cfn-lint
+      - name: Validate infrastructure
+        run: cfn-lint infrastructure/cineverse-v2.yaml
+      - name: Configure AWS with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
-      - name: Terraform Init
-        run: cd infrastructure && terraform init
-      - name: Terraform Plan
-        run: cd infrastructure && terraform plan -out=tfplan
-      - name: Terraform Apply
-        run: cd infrastructure && terraform apply tfplan
-      - name: Generate Frontend Config
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy CloudFormation
         run: |
-          API_URL=$(terraform -chdir=infrastructure output -raw api_url)
-          echo "const API_URL = '${API_URL}';" > frontend/config.js
-      - name: Sync Frontend to S3
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          DOMAIN_PREFIX="cineverse-${ACCOUNT_ID}"
+          aws cloudformation deploy --template-file infrastructure/cineverse-v2.yaml --stack-name "$STACK_NAME" --capabilities CAPABILITY_NAMED_IAM --no-fail-on-empty-changeset --parameter-overrides ProjectName=cineverse EnvironmentName=prod CognitoDomainPrefix="$DOMAIN_PREFIX"
+      - name: Publish frontend
+        shell: bash
         run: |
-          BUCKET=$(terraform -chdir=infrastructure output -raw bucket_name)
-          aws s3 sync frontend/ s3://$BUCKET/
-      - name: Create CloudFront Invalidation
+          output(){ aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+          BUCKET=$(output FrontendBucketName); API_URL=$(output ApiUrl); FRONTEND_URL=$(output FrontendUrl); COGNITO_DOMAIN=$(output CognitoDomain); CLIENT_ID=$(output CognitoClientId); DIST_DOMAIN=$(output CloudFrontDomainName)
+          cat > frontend/config.js <<EOF
+          window.CINEVERSE_CONFIG = { apiUrl: "$API_URL", cognitoDomain: "$COGNITO_DOMAIN", clientId: "$CLIENT_ID", redirectUri: "$FRONTEND_URL", logoutUri: "$FRONTEND_URL" };
+          EOF
+          aws s3 sync frontend/ "s3://$BUCKET/" --delete --exclude config.example.js --cache-control 'public,max-age=300'
+          DIST_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?DomainName=='$DIST_DOMAIN'].Id | [0]" --output text)
+          test -z "$DIST_ID" -o "$DIST_ID" = None || aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/*'
+      - name: Smoke test
         run: |
-          DIST_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Aliases.Items[0]=='$(terraform -chdir=infrastructure output -raw cloudfront_url | cut -d'.' -f1).cloudfront.net']" --output text)
-          aws cloudfront create-invalidation --distribution-id $DIST_ID --paths "/*"
-      - name: Smoke Test
-        run: |
-          FRONTEND_URL="https://$(terraform -chdir=infrastructure output -raw cloudfront_url)"
-          API_URL="$(terraform -chdir=infrastructure output -raw api_url)"
-          echo "Testing frontend: $FRONTEND_URL"
-          curl --fail --silent --show-error "$FRONTEND_URL" || exit 1
-          echo "Testing API: $API_URL"
-          curl --fail --silent --show-error "$API_URL" || exit 1
-          echo "✅ Smoke tests passed!"
+          FRONTEND_URL=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='FrontendUrl'].OutputValue" --output text)
+          API_URL=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
+          curl --fail --silent --show-error "$FRONTEND_URL" >/dev/null
+          curl --fail --silent --show-error "$API_URL" >/dev/null
+          echo "Smoke tests passed: $FRONTEND_URL"
